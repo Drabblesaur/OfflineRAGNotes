@@ -420,7 +420,7 @@
      The handle is then translated left by half the gutter so it centers inside it.
      e.g. w-8 = 2rem, w-10 = 2.5rem, w-12 = 3rem */
   :root {
-    --gutter-width: 2rem; /* matches w-8 */
+    --gutter-width: 1.6rem; /* matches w-8 */
   }
 
   .drag-handle-gutter {

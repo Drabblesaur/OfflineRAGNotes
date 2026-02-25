@@ -22,28 +22,11 @@ export function Divider() {
   return <div className="h-5 w-px bg-border mx-1" />;
 }
 
-// ── Tooltip for Toggle / Button (asChild works fine here) ─────────────────────
-export function Tip({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="bottom">
-        <p>{label}</p>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-// ── Tooltip for ToggleGroupItems ──────────────────────────────────────────────
-// asChild conflicts with Radix internals on ToggleGroupItem, so we wrap in a
-// span as the trigger instead to avoid breaking toggle-group state tracking.
-export function TipItem({
+// ── Tooltip wrapper ───────────────────────────────────────────────────────────
+// Always wraps children in a <span> so the trigger is a plain DOM element.
+// This sidesteps the asChild/Radix conflict with ToggleGroupItem and is equally
+// safe for Toggle and Button — no need to maintain two tooltip variants.
+export function ToolTip({
   label,
   children,
 }: {
@@ -104,7 +87,7 @@ export function ToolbarToggle({
   children: React.ReactNode;
 }) {
   return (
-    <TipItem label={label}>
+    <ToolTip label={label}>
       <Toggle
         className={iconBtn}
         pressed={pressed}
@@ -114,7 +97,7 @@ export function ToolbarToggle({
       >
         {children}
       </Toggle>
-    </TipItem>
+    </ToolTip>
   );
 }
 
@@ -130,30 +113,24 @@ export function ToolbarGroupItem({
   children: React.ReactNode;
 }) {
   return (
-    <TipItem label={label}>
+    <ToolTip label={label}>
       <ToggleGroupItem className={iconBtn} value={value} onMouseDown={stopBlur}>
         {children}
       </ToggleGroupItem>
-    </TipItem>
+    </ToolTip>
   );
 }
 
-// ── Menu open tracker ─────────────────────────────────────────────────────────
-// Counts how many menus are open at once so the parent can keep the sticky
-// toolbar visible while any dropdown is still open.
-export function MenuTracker({
-  onAnyMenuOpenChange,
-  children,
-}: {
-  onAnyMenuOpenChange?: (open: boolean) => void;
-  children: (opts: { track: (open: boolean) => void }) => React.ReactNode;
-}) {
+// ── useMenuTracker ────────────────────────────────────────────────────────────
+// Counts how many menus are currently open so the parent can keep the sticky
+// toolbar visible while any dropdown is still showing.
+// Returns a stable `track(open)` callback to pass to each menu's onOpenChange.
+export function useMenuTracker(onAnyMenuOpenChange?: (open: boolean) => void) {
   const openCount = React.useRef(0);
 
   const track = React.useCallback(
     (open: boolean) => {
-      if (open) openCount.current += 1;
-      else openCount.current = Math.max(0, openCount.current - 1);
+      openCount.current = Math.max(0, openCount.current + (open ? 1 : -1));
       onAnyMenuOpenChange?.(openCount.current > 0);
     },
     [onAnyMenuOpenChange],
@@ -163,5 +140,5 @@ export function MenuTracker({
     return () => onAnyMenuOpenChange?.(false);
   }, [onAnyMenuOpenChange]);
 
-  return <>{children({ track })}</>;
+  return track;
 }

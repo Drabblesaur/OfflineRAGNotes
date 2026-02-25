@@ -13,7 +13,7 @@ import {
 
 import { EditorState, ToolbarGroup, ToolbarItem } from "./Types";
 import {
-  Tip,
+  ToolTip,
   MenuTriggerButton,
   Divider,
   stopBlur,
@@ -106,14 +106,14 @@ export function CollapsedToolbar({ editor, groups, state, track }: Props) {
                 track(open);
               }}
             >
-              <Tip label={group.label}>
+              <ToolTip label={group.label}>
                 <DropdownMenuTrigger asChild>
                   <MenuTriggerButton
                     icon={group.triggerIcon}
                     label={group.label}
                   />
                 </DropdownMenuTrigger>
-              </Tip>
+              </ToolTip>
               <DropdownMenuContent
                 align="start"
                 sideOffset={8}

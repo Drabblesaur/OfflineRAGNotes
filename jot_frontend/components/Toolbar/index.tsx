@@ -1,7 +1,7 @@
 import { Editor, useEditorState } from "@tiptap/react";
 
 import { DEFAULT_STATE, EditorState, HeadingValue, AlignValue } from "./Types";
-import { MenuTracker } from "./Primitives";
+import { useMenuTracker } from "./Primitives";
 import { TOOLBAR_GROUPS } from "./toolbar-config";
 import { CollapsedToolbar } from "./CollapsedToolbar";
 import { ExpandedToolbar } from "./ExpandedToolbar";
@@ -12,31 +12,36 @@ type Props = {
   onMenuOpenChange?: (open: boolean) => void;
 };
 
+// ── Heading / align helpers ───────────────────────────────────────────────────
+// Centralised here so the selector below never has to re-implement the logic,
+// and toolbar-config.tsx never has to import from tiptap directly.
+
+function deriveHeading(e: Editor): HeadingValue {
+  if (e.isActive("heading", { level: 1 })) return "h1";
+  if (e.isActive("heading", { level: 2 })) return "h2";
+  if (e.isActive("heading", { level: 3 })) return "h3";
+  return "p";
+}
+
+function deriveAlign(e: Editor): AlignValue {
+  if (e.isActive({ textAlign: "center" })) return "center";
+  if (e.isActive({ textAlign: "right" })) return "right";
+  return "left";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function Toolbar({ editor, onMenuOpenChange }: Props) {
-  // useEditorState must be called before any early return
+  // Must be called before any early return (Rules of Hooks)
   const rawState = useEditorState({
     editor,
     selector: (ctx): EditorState => {
       const e = ctx?.editor;
       if (!e) return DEFAULT_STATE;
 
-      const heading: HeadingValue = e.isActive("heading", { level: 1 })
-        ? "h1"
-        : e.isActive("heading", { level: 2 })
-          ? "h2"
-          : e.isActive("heading", { level: 3 })
-            ? "h3"
-            : "p";
-
-      const align: AlignValue = e.isActive({ textAlign: "center" })
-        ? "center"
-        : e.isActive({ textAlign: "right" })
-          ? "right"
-          : "left";
-
       return {
-        heading,
-        align,
+        heading: deriveHeading(e),
+        align: deriveAlign(e),
         bold: e.isActive("bold"),
         italic: e.isActive("italic"),
         strike: e.isActive("strike"),
@@ -50,27 +55,20 @@ export default function Toolbar({ editor, onMenuOpenChange }: Props) {
     },
   });
 
+  const track = useMenuTracker(onMenuOpenChange);
   const state = rawState ?? DEFAULT_STATE;
 
   if (!editor) return null;
 
   return (
-    <MenuTracker onAnyMenuOpenChange={onMenuOpenChange}>
-      {({ track }) => (
-        <>
-          <CollapsedToolbar
-            editor={editor}
-            groups={TOOLBAR_GROUPS}
-            state={state}
-            track={track}
-          />
-          <ExpandedToolbar
-            editor={editor}
-            groups={TOOLBAR_GROUPS}
-            state={state}
-          />
-        </>
-      )}
-    </MenuTracker>
+    <>
+      <CollapsedToolbar
+        editor={editor}
+        groups={TOOLBAR_GROUPS}
+        state={state}
+        track={track}
+      />
+      <ExpandedToolbar editor={editor} groups={TOOLBAR_GROUPS} state={state} />
+    </>
   );
 }
