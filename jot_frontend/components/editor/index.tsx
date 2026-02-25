@@ -7,7 +7,7 @@ import Highlight from "@tiptap/extension-highlight";
 import { ListKeymap } from "@tiptap/extension-list-keymap";
 import GlobalDragHandle from "tiptap-extension-global-drag-handle";
 import { useEffect, useRef, useState } from "react";
-import ToolBar from "./Toolbar";
+import Toolbar from "@/components/Toolbar";
 
 export default function Editor() {
   const [focused, setFocused] = useState(false);
@@ -93,7 +93,7 @@ export default function Editor() {
           }
         `}
       >
-        <ToolBar editor={editor} onMenuOpenChange={handleMenuOpenChange} />
+        <Toolbar editor={editor} onMenuOpenChange={handleMenuOpenChange} />
       </div>
 
       <div className="w-full border rounded-lg flex">

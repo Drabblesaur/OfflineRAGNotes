@@ -1,4 +1,4 @@
-import Editor from "@/components/editor";
+import Editor from "@/components/Editor";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default function Home() {
