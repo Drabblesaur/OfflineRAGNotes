@@ -1,6 +1,7 @@
 import { Editor, useEditorState } from "@tiptap/react";
 
-import { DEFAULT_STATE, EditorState, HeadingValue, AlignValue } from "./Types";
+import { DEFAULT_STATE } from "./Types";
+import type { EditorState, HeadingValue, AlignValue } from "./Types";
 import { useMenuTracker } from "./Primitives";
 import { TOOLBAR_GROUPS } from "./toolbar-config";
 import { CollapsedToolbar } from "./CollapsedToolbar";

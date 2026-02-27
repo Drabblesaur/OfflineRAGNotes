@@ -1,5 +1,3 @@
-"use client";
-
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
@@ -28,7 +26,7 @@ export default function Editor() {
         scrollTreshold: 100,
       }),
     ],
-    content: "<p>Start writing...</p>",
+    content: "<p>Hello World! 🌍</p><p>Start editing...</p>",
     editorProps: {
       attributes: {
         class:

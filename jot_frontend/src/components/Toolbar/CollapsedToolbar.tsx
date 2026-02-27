@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { EditorState, ToolbarGroup, ToolbarItem } from "./Types";
+import type { EditorState, ToolbarGroup, ToolbarItem } from "./Types";
 import {
   ToolTip,
   MenuTriggerButton,

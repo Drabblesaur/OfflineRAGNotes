@@ -4,7 +4,7 @@ import { Editor } from "@tiptap/react";
 
 import { ToggleGroup } from "@/components/ui/toggle-group";
 
-import { EditorState, ToolbarGroup, ToolbarItem } from "./Types";
+import type { EditorState, ToolbarGroup, ToolbarItem } from "./Types";
 import { Divider, ToolbarToggle, ToolbarGroupItem } from "./Primitives";
 
 type Props = {

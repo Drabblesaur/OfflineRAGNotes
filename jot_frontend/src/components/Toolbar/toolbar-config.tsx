@@ -21,7 +21,7 @@ import {
   ListChecks,
 } from "lucide-react";
 
-import { ToolbarGroup } from "./Types";
+import type { ToolbarGroup } from "./Types";
 
 export const TOOLBAR_GROUPS: ToolbarGroup[] = [
   // ── Headings ────────────────────────────────────────────────────────────────
