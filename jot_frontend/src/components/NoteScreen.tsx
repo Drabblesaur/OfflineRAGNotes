@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { JSONContent } from "@tiptap/core";
 import { format } from "date-fns";
-import { Star, Tag, X, Plus, Calendar, ChevronRight } from "lucide-react";
+import { Star, Tag, X, Plus, Calendar, List } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +41,7 @@ export default function NoteScreen({ note, onChange }: Props) {
   const [date, setDate] = useState<Date>(note.date);
   const [focused, setFocused] = useState(false);
   const [tocItems, setTocItems] = useState<ToCItem[]>([]);
-  const [tocOpen, setTocOpen] = useState(true);
+  const [tocOpen, setTocOpen] = useState(false);
 
   const [tagInput, setTagInput] = useState("");
   const [tagInputOpen, setTagInputOpen] = useState(false);
@@ -267,6 +267,31 @@ export default function NoteScreen({ note, onChange }: Props) {
             </Button>
           )}
         </div>
+
+        {/* ToC toggle — only shown when the note has headings */}
+        {tocItems.length > 0 && (
+          <>
+            <div className="w-px h-4 bg-border" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTocOpen((o) => !o)}
+              aria-label={
+                tocOpen ? "Hide table of contents" : "Show table of contents"
+              }
+              aria-expanded={tocOpen}
+              className={cn(
+                "h-7 px-2 gap-1.5 font-normal transition-colors",
+                tocOpen
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <List className="size-3.5" />
+              Contents
+            </Button>
+          </>
+        )}
       </div>
 
       {/* ── Divider ── */}
@@ -286,50 +311,30 @@ export default function NoteScreen({ note, onChange }: Props) {
           />
         </div>
 
-        {/* Table of Contents — only shown on xl+ screens when headings exist */}
-        {tocItems.length > 0 && (
-          <aside className="hidden xl:flex flex-col w-44 shrink-0 sticky top-6">
-            {/* Header — always visible, toggles the list */}
-            <button
-              onClick={() => setTocOpen((o) => !o)}
-              className="flex items-center gap-1.5 mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors group"
-              aria-expanded={tocOpen}
-            >
-              <ChevronRight
-                className={cn(
-                  "size-3 transition-transform duration-200",
-                  tocOpen && "rotate-90",
-                )}
-              />
+        {/* Table of Contents — only shown on xl+ screens when toggled on */}
+        {tocOpen && tocItems.length > 0 && (
+          <aside className="hidden xl:flex flex-col gap-1 w-44 shrink-0 sticky top-6 border rounded-md bg-white/95 backdrop-blur shadow-sm p-4">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
               On this page
-            </button>
-
-            {/* Collapseable list */}
-            <div
-              className={cn(
-                "flex flex-col gap-1 overflow-hidden transition-all duration-200",
-                tocOpen ? "opacity-100" : "max-h-0 opacity-0",
-              )}
-            >
-              {tocItems.map((item) => (
-                <a
-                  key={item.id}
-                  href={`#${item.id}`}
-                  className={cn(
-                    "text-sm truncate transition-colors hover:text-foreground",
-                    item.level === 1 && "pl-0",
-                    item.level === 2 && "pl-3",
-                    item.level === 3 && "pl-6",
-                    item.isActive
-                      ? "text-foreground font-medium"
-                      : "text-muted-foreground",
-                    item.isScrolledOver && "opacity-50",
-                  )}
-                >
-                  {item.textContent}
-                </a>
-              ))}
-            </div>
+            </p>
+            {tocItems.map((item) => (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                className={cn(
+                  "text-sm truncate transition-colors hover:text-foreground",
+                  item.level === 1 && "pl-0",
+                  item.level === 2 && "pl-3",
+                  item.level === 3 && "pl-6",
+                  item.isActive
+                    ? "text-foreground font-medium"
+                    : "text-muted-foreground",
+                  item.isScrolledOver && "opacity-50",
+                )}
+              >
+                {item.textContent}
+              </a>
+            ))}
           </aside>
         )}
       </div>
