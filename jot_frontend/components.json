@@ -19,6 +19,5 @@
     "lib": "@/lib",
     "hooks": "@/hooks"
   },
-  "registries": {},
-  "framework": "vite"
+  "registries": {}
 }
