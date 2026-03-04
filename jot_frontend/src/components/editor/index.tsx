@@ -106,7 +106,7 @@ export default function Editor({
     <div className="flex flex-col items-center w-full">
       <div
         className={`
-          mb-2 transition-all duration-200
+          sticky top-2 z-10 mb-2 transition-all duration-200
           ${
             focused
               ? "opacity-100 translate-y-0 pointer-events-auto"

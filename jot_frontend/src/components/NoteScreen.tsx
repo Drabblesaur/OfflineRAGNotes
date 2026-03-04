@@ -172,7 +172,7 @@ export default function NoteScreen({ note, onChange }: Props) {
       <div className="flex items-start gap-2">
         <input
           className={cn(
-            "flex-1 text-3xl font-semibold tracking-tight bg-transparent border-none outline-none",
+            "flex-1 text-4xl font-semibold tracking-tight bg-transparent border-none outline-none",
             "placeholder:text-muted-foreground/40 text-foreground leading-tight",
           )}
           value={title}
@@ -298,9 +298,12 @@ export default function NoteScreen({ note, onChange }: Props) {
       <div className="border-t" />
 
       {/* ── Editor + ToC ── */}
-      <div className="flex gap-8 items-start">
-        {/* Editor */}
-        <div ref={editorRef} className="flex-1 min-w-0">
+      <div className="flex items-start">
+        {/* Editor — flex-1 so it naturally fills remaining space as aside width changes */}
+        <div
+          ref={editorRef}
+          className="flex-1 min-w-0 transition-all duration-300"
+        >
           <Editor
             focused={focused}
             noteId={note.id}
@@ -311,31 +314,41 @@ export default function NoteScreen({ note, onChange }: Props) {
           />
         </div>
 
-        {/* Table of Contents — only shown on xl+ screens when toggled on */}
-        {tocOpen && tocItems.length > 0 && (
-          <aside className="hidden xl:flex flex-col gap-1 w-44 shrink-0 sticky top-6 border rounded-md bg-white/95 backdrop-blur shadow-sm p-4">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              On this page
-            </p>
-            {tocItems.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className={cn(
-                  "text-sm truncate transition-colors hover:text-foreground",
-                  item.level === 1 && "pl-0",
-                  item.level === 2 && "pl-3",
-                  item.level === 3 && "pl-6",
-                  item.isActive
-                    ? "text-foreground font-medium"
-                    : "text-muted-foreground",
-                  item.isScrolledOver && "opacity-50",
-                )}
-              >
-                {item.textContent}
-              </a>
-            ))}
-          </aside>
+        {/* Table of Contents — width transitions between 0 and w-44 so the
+            editor flex-1 naturally shrinks and expands in response. */}
+        {tocItems.length > 0 && (
+          <div
+            className={cn(
+              "hidden xl:block shrink-0 sticky top-6 overflow-hidden",
+              "transition-all duration-300 ease-in-out",
+              tocOpen ? "w-44 opacity-100 ml-8" : "w-0 opacity-0 ml-0",
+            )}
+            aria-hidden={!tocOpen}
+          >
+            <aside className="w-44 flex flex-col gap-1 border rounded-md bg-white/95 backdrop-blur shadow-sm p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                On this page
+              </p>
+              {tocItems.map((item) => (
+                <a
+                  key={item.id}
+                  href={`#${item.id}`}
+                  className={cn(
+                    "text-sm truncate transition-colors hover:text-foreground",
+                    item.level === 1 && "pl-0",
+                    item.level === 2 && "pl-3",
+                    item.level === 3 && "pl-6",
+                    item.isActive
+                      ? "text-foreground font-medium"
+                      : "text-muted-foreground",
+                    item.isScrolledOver && "opacity-50",
+                  )}
+                >
+                  {item.textContent}
+                </a>
+              ))}
+            </aside>
+          </div>
         )}
       </div>
     </div>
