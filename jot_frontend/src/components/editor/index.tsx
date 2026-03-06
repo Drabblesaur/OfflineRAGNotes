@@ -1,19 +1,47 @@
 import { useEditor, EditorContent } from "@tiptap/react";
+import type { JSONContent } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
 import Highlight from "@tiptap/extension-highlight";
 import { ListKeymap } from "@tiptap/extension-list-keymap";
 import GlobalDragHandle from "tiptap-extension-global-drag-handle";
-import { useEffect, useRef, useState } from "react";
+import {
+  TableOfContents,
+  getHierarchicalIndexes,
+} from "@tiptap/extension-table-of-contents";
+import { UniqueID } from "@tiptap/extension-unique-id";
+import { useRef, useEffect } from "react";
 import Toolbar from "@/components/Toolbar";
 
-export default function Editor() {
-  const [focused, setFocused] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+export type ToCItem = {
+  id: string;
+  textContent: string;
+  level: number;
+  isActive: boolean;
+  isScrolledOver: boolean;
+  itemIndex: string;
+};
 
-  const rootRef = useRef<HTMLDivElement | null>(null);
+type Props = {
+  /** Controlled by NoteScreen's pointer listener — Editor does not own this. */
+  focused: boolean;
+  noteId: string;
+  content: JSONContent;
+  onContentChange: (content: JSONContent) => void;
+  onToCChange?: (items: ToCItem[]) => void;
+  onMenuOpenChange?: (open: boolean) => void;
+};
 
-  const showToolbar = focused || menuOpen;
+export default function Editor({
+  focused,
+  noteId,
+  content,
+  onContentChange,
+  onToCChange,
+  onMenuOpenChange,
+}: Props) {
+  const menuOpenRef = useRef(false);
+  const prevNoteId = useRef<string | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -25,67 +53,62 @@ export default function Editor() {
         dragHandleWidth: 20,
         scrollTreshold: 100,
       }),
+      UniqueID.configure({
+        // Assign stable IDs to headings so ToC anchor links work.
+        types: ["heading"],
+      }),
+      TableOfContents.configure({
+        getIndex: getHierarchicalIndexes,
+        onUpdate: (items) => onToCChange?.(items),
+      }),
     ],
-    content: "<p>Hello World! 🌍</p><p>Start editing...</p>",
+    // Initial content from the note. Tiptap treats this as a seed — it is NOT
+    // a controlled value. Note switching is handled via setContent() below.
+    content,
     editorProps: {
       attributes: {
         class:
           "prose prose-sm sm:prose max-w-none focus:outline-none min-h-[300px] p-4",
       },
     },
-    onFocus: () => setFocused(true),
-    // IMPORTANT: no onBlur
+    onUpdate: ({ editor }) => {
+      onContentChange(editor.getJSON());
+    },
+    // No onFocus — NoteScreen's pointer listener owns focused state entirely.
+    // Relying on tiptap's onFocus caused spurious refocus when toolbar buttons
+    // called e.preventDefault() on mousedown (stopBlur).
     immediatelyRender: false,
   });
 
-  const handleMenuOpenChange = (open: boolean) => {
-    setMenuOpen(open);
-
-    // ✅ While a dropdown is open, force toolbar to stay visible
-    if (open) setFocused(true);
-
-    if (!open) editor?.commands.focus();
-  };
-
+  // When the active note changes, replace editor content.
+  // We guard with noteId rather than comparing content objects to avoid
+  // resetting the editor mid-edit if the parent re-renders for other reasons.
   useEffect(() => {
-    const onPointerDownCapture = (e: PointerEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
+    if (!editor || editor.isDestroyed) return;
+    if (prevNoteId.current === noteId) return;
+    prevNoteId.current = noteId;
+    // false = don't emit an onUpdate, so we don't immediately write back
+    // the content we just set.
+    editor.commands.setContent(content, false);
+  }, [noteId, editor]);
 
-      // ✅ Ignore clicks inside Radix portals (dropdown content lives here)
-      // This prevents toolbar from hiding while selecting a dropdown item.
-      if (target.closest("[data-radix-portal]")) return;
-
-      // ✅ If any menu is open, do not hide toolbar
-      if (menuOpen) return;
-
-      const root = rootRef.current;
-      if (!root) return;
-
-      if (!root.contains(target)) {
-        setFocused(false);
-      }
-    };
-
-    document.addEventListener("pointerdown", onPointerDownCapture, true);
-    return () =>
-      document.removeEventListener("pointerdown", onPointerDownCapture, true);
-  }, [menuOpen]);
-
-  // ✅ When interacting with toolbar, keep it visible and prevent selection loss.
-  const handleToolbarPointerDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    setFocused(true);
+  const handleMenuOpenChange = (open: boolean) => {
+    menuOpenRef.current = open;
+    // Only restore editor focus on menu close if the editor area is still
+    // active — don't steal focus if the user has moved to the title/tags.
+    if (!open && focused && editor && !editor.isDestroyed) {
+      editor.commands.focus();
+    }
+    onMenuOpenChange?.(open);
   };
 
   return (
-    <div ref={rootRef} className="flex flex-col items-center w-full">
+    <div className="flex flex-col items-center w-full">
       <div
-        onPointerDown={handleToolbarPointerDown}
         className={`
-          mb-2 transition-all duration-200
+          sticky top-2 z-10 mb-2 transition-all duration-200
           ${
-            showToolbar
+            focused
               ? "opacity-100 translate-y-0 pointer-events-auto"
               : "opacity-0 -translate-y-1 pointer-events-none"
           }
