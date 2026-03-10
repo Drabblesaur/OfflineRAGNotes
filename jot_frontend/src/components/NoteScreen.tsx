@@ -24,7 +24,8 @@ export type Note = {
   contentMd: string; // derived plain text for RAG embedding
   favorite: boolean;
   tags: string[];
-  date: Date;
+  date: Date; // user-editable note date
+  lastEditedAt: Date; // auto-stamped on every save, not user-controlled
 };
 
 type Props = {
@@ -94,7 +95,15 @@ export default function NoteScreen({ note, onChange }: Props) {
   }
 
   function patch(partial: Partial<Note>) {
-    onChange?.({ ...note, title, favorite, tags, date, ...partial });
+    onChange?.({
+      ...note,
+      title,
+      favorite,
+      tags,
+      date,
+      ...partial,
+      lastEditedAt: new Date(),
+    });
   }
 
   function handleTitleChange(value: string) {
@@ -172,7 +181,7 @@ export default function NoteScreen({ note, onChange }: Props) {
       <div className="flex items-start gap-2">
         <input
           className={cn(
-            "flex-1 text-4xl font-semibold tracking-tight bg-transparent border-none outline-none",
+            "flex-1 text-3xl font-semibold tracking-tight bg-transparent border-none outline-none",
             "placeholder:text-muted-foreground/40 text-foreground leading-tight",
           )}
           value={title}
@@ -321,11 +330,11 @@ export default function NoteScreen({ note, onChange }: Props) {
             className={cn(
               "hidden xl:block shrink-0 sticky top-6 overflow-hidden",
               "transition-all duration-300 ease-in-out",
-              tocOpen ? "w-44 opacity-100 ml-8" : "w-0 opacity-0 ml-0",
+              tocOpen ? "w-52 opacity-100 ml-8" : "w-0 opacity-0 ml-0",
             )}
             aria-hidden={!tocOpen}
           >
-            <aside className="w-44 flex flex-col gap-1 border rounded-md bg-white/95 backdrop-blur shadow-sm p-4">
+            <aside className="w-52 flex flex-col gap-1 border rounded-md bg-white/95 backdrop-blur shadow-sm p-4">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 On this page
               </p>

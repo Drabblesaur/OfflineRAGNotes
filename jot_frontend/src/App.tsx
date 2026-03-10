@@ -1,22 +1,17 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
 import Editor from "@/components/editor";
 import { TooltipProvider } from "./components/ui/tooltip";
 import NoteScreen from "./components/NoteScreen";
+import FolderScreen from "./components/FolderScreen";
+import { mockFolder } from "./mock/mockFolder";
+import { mockNote } from "./mock/mockNote";
 function App() {
   return (
     <TooltipProvider>
-      <NoteScreen
-        note={{
-          id: "1",
-          title: "My Note",
-          content: "",
-          favorite: false,
-          tags: [],
-          date: new Date(),
-        }}
+      <FolderScreen
+        folder={mockFolder}
+        onNoteSelect={(note) => console.log("Selected note:", note)}
       />
+      {/*<NoteScreen note={mockNote} onContentChange={(content) => console.log("Content changed:", content)}/>*/}
     </TooltipProvider>
   );
 }
