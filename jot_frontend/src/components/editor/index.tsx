@@ -59,7 +59,13 @@ export default function Editor({
       }),
       TableOfContents.configure({
         getIndex: getHierarchicalIndexes,
-        onUpdate: (items) => onToCChange?.(items),
+        onUpdate: (items) =>
+          onToCChange?.(
+            items.map((item) => ({
+              ...item,
+              itemIndex: String(item.itemIndex),
+            })),
+          ),
       }),
     ],
     // Initial content from the note. Tiptap treats this as a seed — it is NOT
@@ -89,7 +95,7 @@ export default function Editor({
     prevNoteId.current = noteId;
     // false = don't emit an onUpdate, so we don't immediately write back
     // the content we just set.
-    editor.commands.setContent(content, false);
+    editor.commands.setContent(content, { emitUpdate: false });
   }, [noteId, editor]);
 
   const handleMenuOpenChange = (open: boolean) => {
