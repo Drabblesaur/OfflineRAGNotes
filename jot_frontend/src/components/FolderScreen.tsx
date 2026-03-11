@@ -1,8 +1,26 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { LayoutGrid, List, Star, Tag, FileText, SquarePen } from "lucide-react";
+import {
+  LayoutGrid,
+  List,
+  Star,
+  Tag,
+  FileText,
+  SquarePen,
+  Search,
+  ArrowUpDown,
+  Check,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Note } from "@/components/NoteScreen";
 
@@ -16,6 +34,16 @@ export type Folder = {
 
 type View = "list" | "gallery";
 
+type SortKey = "lastEditedAt" | "date" | "dateAsc" | "titleAZ" | "titleZA";
+
+const SORT_LABELS: Record<SortKey, string> = {
+  lastEditedAt: "Last Edited",
+  date: "Date: Newest First",
+  dateAsc: "Date: Oldest First",
+  titleAZ: "Title A–Z",
+  titleZA: "Title Z–A",
+};
+
 type Props = {
   folder: Folder;
   onNoteSelect?: (note: Note) => void;
@@ -27,7 +55,6 @@ type Props = {
 
 function getPlainTextPreview(note: Note): string {
   if (!note.contentJSON?.content) return "";
-
   const extractText = (nodes: any[]): string =>
     nodes
       .flatMap((node) => {
@@ -37,8 +64,35 @@ function getPlainTextPreview(note: Note): string {
       })
       .join(" ")
       .trim();
-
   return extractText(note.contentJSON.content);
+}
+
+function sortNotes(notes: Note[], key: SortKey): Note[] {
+  return [...notes].sort((a, b) => {
+    switch (key) {
+      case "lastEditedAt":
+        return b.lastEditedAt.getTime() - a.lastEditedAt.getTime();
+      case "date":
+        return b.date.getTime() - a.date.getTime();
+      case "dateAsc":
+        return a.date.getTime() - b.date.getTime();
+      case "titleAZ":
+        return (a.title || "Untitled").localeCompare(b.title || "Untitled");
+      case "titleZA":
+        return (b.title || "Untitled").localeCompare(a.title || "Untitled");
+    }
+  });
+}
+
+function filterNotes(notes: Note[], query: string): Note[] {
+  if (!query.trim()) return notes;
+  const q = query.toLowerCase();
+  return notes.filter(
+    (note) =>
+      (note.title || "Untitled").toLowerCase().includes(q) ||
+      getPlainTextPreview(note).toLowerCase().includes(q) ||
+      note.tags.some((tag) => tag.toLowerCase().includes(q)),
+  );
 }
 
 // ── List Row ──────────────────────────────────────────────────────────────────
@@ -55,10 +109,8 @@ function NoteListRow({ note, onClick }: { note: Note; onClick: () => void }) {
         "hover:bg-muted/50 transition-colors group",
       )}
     >
-      {/* Icon */}
       <FileText className="size-4 mt-0.5 shrink-0 text-muted-foreground/60 group-hover:text-muted-foreground transition-colors" />
 
-      {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-sm font-medium text-foreground truncate">
@@ -101,6 +153,10 @@ function NoteListRow({ note, onClick }: { note: Note; onClick: () => void }) {
           </div>
         )}
       </div>
+
+      <span className="text-xs text-muted-foreground/60 shrink-0 mt-0.5 whitespace-nowrap">
+        {format(note.lastEditedAt, "h:mm a")}
+      </span>
     </button>
   );
 }
@@ -125,7 +181,6 @@ function NoteGalleryCard({
         "hover:-translate-y-0.5 group overflow-hidden",
       )}
     >
-      {/* Card header — mirrors NoteScreen's title area */}
       <div className="px-4 pt-4 pb-3 border-b border-border/60">
         <div className="flex items-start gap-2">
           <span className="flex-1 text-sm font-semibold text-foreground leading-tight line-clamp-2">
@@ -135,8 +190,6 @@ function NoteGalleryCard({
             <Star className="size-3.5 shrink-0 mt-0.5 fill-amber-400 text-amber-400" />
           )}
         </div>
-
-        {/* Meta row — mirrors NoteScreen's meta row */}
         <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
           <span>{format(note.date, "MMM d, yyyy")}</span>
           {note.tags.length > 0 && (
@@ -151,8 +204,6 @@ function NoteGalleryCard({
           )}
         </div>
       </div>
-
-      {/* Preview body */}
       <div className="px-4 py-3 flex-1">
         {preview ? (
           <p className="text-xs text-muted-foreground line-clamp-4 leading-relaxed">
@@ -177,11 +228,13 @@ export default function FolderScreen({
   onNewNote,
 }: Props) {
   const [view, setView] = useState<View>("list");
+  const [sort, setSort] = useState<SortKey>("lastEditedAt");
+  const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [name, setName] = useState(folder.name);
 
   function handleNameBlur() {
     const trimmed = name.trim();
-    // Revert to original if left empty
     if (!trimmed) {
       setName(folder.name);
       return;
@@ -197,114 +250,218 @@ export default function FolderScreen({
     }
   }
 
-  // Sort by date descending — most recently edited first.
-  const sortedNotes = [...folder.notes].sort(
-    (a, b) => b.date.getTime() - a.date.getTime(),
-  );
+  function handleSearchClose() {
+    setSearch("");
+    setSearchOpen(false);
+  }
+
+  const processedNotes = sortNotes(filterNotes(folder.notes, search), sort);
+  const isEmpty = folder.notes.length === 0;
+  const noResults = !isEmpty && processedNotes.length === 0;
 
   return (
     <div className="flex flex-col h-full w-full">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-white/80 backdrop-blur sticky top-0 z-10">
-        <div>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={handleNameBlur}
-            onKeyDown={handleNameKeyDown}
-            aria-label="Folder name"
-            className={cn(
-              "text-xl font-semibold text-foreground tracking-tight bg-transparent",
-              "border-none outline-none w-full",
-              "placeholder:text-muted-foreground/40",
-              "hover:bg-muted/40 focus:bg-muted/40 rounded px-1 -mx-1 transition-colors",
-            )}
-          />
-          <p className="text-xs text-muted-foreground mt-0.5 px-1">
-            {sortedNotes.length} {sortedNotes.length === 1 ? "note" : "notes"}
-          </p>
+      <div className="border-b bg-white/80 backdrop-blur sticky top-0 z-10">
+        <div className="flex items-center justify-between px-4 py-3">
+          {/* Folder name + count */}
+          <div>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={handleNameBlur}
+              onKeyDown={handleNameKeyDown}
+              aria-label="Folder name"
+              className={cn(
+                "text-xl font-semibold text-foreground tracking-tight bg-transparent",
+                "border-none outline-none w-full",
+                "placeholder:text-muted-foreground/40",
+                "hover:bg-muted/40 focus:bg-muted/40 rounded px-1 -mx-1 transition-colors",
+              )}
+            />
+            <p className="text-xs text-muted-foreground mt-0.5 px-1">
+              {processedNotes.length}
+              {search ? ` of ${folder.notes.length}` : ""}{" "}
+              {folder.notes.length === 1 ? "note" : "notes"}
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-1">
+            {/* Search toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                searchOpen ? handleSearchClose() : setSearchOpen(true)
+              }
+              aria-label={searchOpen ? "Close search" : "Search notes"}
+              className={cn(
+                "h-8 w-8 p-0 transition-colors",
+                searchOpen
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Search className="size-4" />
+            </Button>
+
+            {/* Sort dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Sort notes"
+                  className={cn(
+                    "h-8 px-2 gap-1.5 transition-colors text-xs font-normal",
+                    sort !== "lastEditedAt"
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <ArrowUpDown className="size-3.5" />
+                  {SORT_LABELS[sort]}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onClick={() => setSort(key)}
+                    className="flex items-center justify-between"
+                  >
+                    {SORT_LABELS[key]}
+                    {sort === key && (
+                      <Check className="size-3.5 text-foreground" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* New note */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                console.log("New note button pressed — folder:", folder.id);
+                onNewNote?.();
+              }}
+              aria-label="New note"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <SquarePen className="size-4" />
+            </Button>
+
+            {/* View toggle */}
+            <div className="flex items-center gap-0.5 border rounded-md p-0.5 bg-muted/40 ml-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setView("list")}
+                aria-label="List view"
+                aria-pressed={view === "list"}
+                className={cn(
+                  "h-7 w-7 p-0 transition-colors",
+                  view === "list"
+                    ? "bg-white shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <List className="size-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setView("gallery")}
+                aria-label="Gallery view"
+                aria-pressed={view === "gallery"}
+                className={cn(
+                  "h-7 w-7 p-0 transition-colors",
+                  view === "gallery"
+                    ? "bg-white shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <LayoutGrid className="size-3.5" />
+              </Button>
+            </div>
+          </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          {/* New note */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              console.log("New note button pressed — folder:", folder.id);
-              onNewNote?.();
-            }}
-            aria-label="New note"
-            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <SquarePen className="size-4" />
-          </Button>
-
-          {/* View toggle */}
-          <div className="flex items-center gap-0.5 border rounded-md p-0.5 bg-muted/40">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setView("list")}
-              aria-label="List view"
-              aria-pressed={view === "list"}
-              className={cn(
-                "h-7 w-7 p-0 transition-colors",
-                view === "list"
-                  ? "bg-white shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <List className="size-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setView("gallery")}
-              aria-label="Gallery view"
-              aria-pressed={view === "gallery"}
-              className={cn(
-                "h-7 w-7 p-0 transition-colors",
-                view === "gallery"
-                  ? "bg-white shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <LayoutGrid className="size-3.5" />
-            </Button>
+        {/* ── Search bar — slides in below the header row ── */}
+        <div
+          className={cn(
+            "overflow-hidden transition-all duration-200",
+            searchOpen ? "max-h-14 opacity-100" : "max-h-0 opacity-0",
+          )}
+        >
+          <div className="px-4 pb-3 flex items-center gap-2">
+            <Search className="size-3.5 shrink-0 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by title, content or tag…"
+              autoFocus={searchOpen}
+              className="h-7 text-sm border-none shadow-none bg-transparent focus-visible:ring-0 px-0 placeholder:text-muted-foreground/50"
+            />
+            {search && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearch("")}
+                className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ── Empty state ── */}
-      {sortedNotes.length === 0 && (
+      {/* ── Empty folder state ── */}
+      {isEmpty && (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground">
           <FileText className="size-10 opacity-20" />
           <p className="text-sm">No notes in this folder</p>
         </div>
       )}
 
+      {/* ── No search results state ── */}
+      {noResults && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground m-8">
+          <Search className="size-10 opacity-20" />
+          <p className="text-sm">No notes match "{search}"</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSearch("")}
+            className="text-xs"
+          >
+            Clear search
+          </Button>
+        </div>
+      )}
+
       {/* ── List view ── */}
-      {sortedNotes.length > 0 && view === "list" && (
+      {!isEmpty && !noResults && view === "list" && (
         <div className="flex-1 overflow-y-auto">
-          <div className="divide-y-0">
-            {sortedNotes.map((note) => (
-              <NoteListRow
-                key={note.id}
-                note={note}
-                onClick={() => onNoteSelect?.(note)}
-              />
-            ))}
-          </div>
+          {processedNotes.map((note) => (
+            <NoteListRow
+              key={note.id}
+              note={note}
+              onClick={() => onNoteSelect?.(note)}
+            />
+          ))}
         </div>
       )}
 
       {/* ── Gallery view ── */}
-      {sortedNotes.length > 0 && view === "gallery" && (
+      {!isEmpty && !noResults && view === "gallery" && (
         <div className="flex-1 overflow-y-auto px-4 py-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {sortedNotes.map((note) => (
+            {processedNotes.map((note) => (
               <NoteGalleryCard
                 key={note.id}
                 note={note}
