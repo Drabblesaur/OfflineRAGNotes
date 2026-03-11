@@ -42,6 +42,8 @@ export default function TabBar({
     e.dataTransfer.setData("text/plain", id);
   }
 
+  const DRAG_END_SENTINEL = "__end__";
+
   function handleDragOver(e: React.DragEvent, id: string) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
@@ -50,17 +52,29 @@ export default function TabBar({
 
   function handleDrop(e: React.DragEvent, targetId: string) {
     e.preventDefault();
-    if (!draggedId || draggedId === targetId) return;
+    if (!draggedId) return;
 
     const from = tabs.findIndex((t) => t.id === draggedId);
-    const to = tabs.findIndex((t) => t.id === targetId);
-    if (from === -1 || to === -1) return;
+    if (from === -1) return;
 
     const reordered = [...tabs];
     const [moved] = reordered.splice(from, 1);
-    reordered.splice(to, 0, moved);
-    onTabsReorder(reordered);
 
+    if (targetId === DRAG_END_SENTINEL) {
+      // Drop after the last tab
+      reordered.push(moved);
+    } else {
+      if (draggedId === targetId) {
+        setDraggedId(null);
+        setDragOverId(null);
+        return;
+      }
+      const to = reordered.findIndex((t) => t.id === targetId);
+      if (to === -1) return;
+      reordered.splice(to, 0, moved);
+    }
+
+    onTabsReorder(reordered);
     setDraggedId(null);
     setDragOverId(null);
   }
@@ -154,6 +168,16 @@ export default function TabBar({
             </button>
           );
         })}
+
+        {/* Trailing drop zone — catches drops past the last tab */}
+        <div
+          className={cn(
+            "flex-1 min-w-[24px] h-9 transition-colors",
+            dragOverId === DRAG_END_SENTINEL && draggedId && "bg-blue-50",
+          )}
+          onDragOver={(e) => handleDragOver(e, DRAG_END_SENTINEL)}
+          onDrop={(e) => handleDrop(e, DRAG_END_SENTINEL)}
+        />
       </div>
 
       {/* Add tab button */}
