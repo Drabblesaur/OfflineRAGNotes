@@ -1,39 +1,66 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TooltipProvider } from "./components/ui/tooltip";
 import TabView from "./components/TabView";
 import type { Tab } from "./components/TabView/Tabs";
 import type { Note } from "./components/NoteScreen";
 import type { Folder } from "./components/FolderScreen";
-import { mockFolder } from "./mock/mockFolder";
-import { mockNote } from "./mock/mockNote";
+import { useNotesStore } from "./hooks/useNotesStore";
+import { loadSession, saveSession } from "./lib/session";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeNoteTab(note: Note): Tab {
-  return { id: `note-${note.id}-${Date.now()}`, type: "note", note };
+  return { id: `note-${note.id}-${Date.now()}`, type: "note", refId: note.id };
 }
 
 function makeFolderTab(folder: Folder): Tab {
-  return { id: `folder-${folder.id}-${Date.now()}`, type: "folder", folder };
+  return {
+    id: `folder-${folder.id}-${Date.now()}`,
+    type: "folder",
+    refId: folder.id,
+  };
 }
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [tabs, setTabs] = useState<Tab[]>([
-    { id: "t1", type: "note", note: mockNote },
-    { id: "t2", type: "folder", folder: mockFolder },
-  ]);
-  const [activeTabId, setActiveTabId] = useState<string | null>("t1");
+  const store = useNotesStore();
 
-  // Flat lists for the command dialog to search across.
-  const allNotes: Note[] = tabs
-    .filter((t): t is Extract<Tab, { type: "note" }> => t.type === "note")
-    .map((t) => t.note);
+  const [tabs, setTabs] = useState<Tab[]>(() => loadSession()?.tabs ?? []);
+  const [activeTabId, setActiveTabId] = useState<string | null>(
+    () => loadSession()?.activeTabId ?? null,
+  );
 
-  const allFolders: Folder[] = tabs
-    .filter((t): t is Extract<Tab, { type: "folder" }> => t.type === "folder")
-    .map((t) => t.folder);
+  const notesById = useMemo(
+    () => new Map(store.notes.map((n) => [n.id, n])),
+    [store.notes],
+  );
+  const foldersById = useMemo(
+    () => new Map(store.folders.map((f) => [f.id, f])),
+    [store.folders],
+  );
+
+  // First-ever load (empty session, e.g. a brand new browser profile): once
+  // seeding/loading finishes, open a tab for the top-level folder so the user
+  // doesn't land on the "no open tabs" empty state immediately after seeding.
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (store.loading || autoOpenedRef.current) return;
+    autoOpenedRef.current = true;
+    if (tabs.length === 0) {
+      const rootFolder = store.folders.find((f) => f.parentId === null);
+      if (rootFolder) {
+        const tab = makeFolderTab(rootFolder);
+        setTabs([tab]);
+        setActiveTabId(tab.id);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.loading]);
+
+  useEffect(() => {
+    saveSession({ tabs, activeTabId });
+  }, [tabs, activeTabId]);
 
   // ── Tab management ──────────────────────────────────────────────────────────
 
@@ -48,11 +75,29 @@ export default function App() {
     if (activeTabId === id) setActiveTabId(remaining.at(-1)?.id ?? null);
   }
 
+  function closeTabsByRefIds(refIds: Set<string>) {
+    setTabs((prev) => {
+      const remaining = prev.filter((t) => !refIds.has(t.refId));
+      if (remaining.length !== prev.length) {
+        setActiveTabId((current) =>
+          remaining.some((t) => t.id === current)
+            ? current
+            : (remaining.at(-1)?.id ?? null),
+        );
+      }
+      return remaining;
+    });
+  }
+
+  function reorderTabs(reordered: Tab[]) {
+    setTabs(reordered);
+  }
+
   // ── Note actions ────────────────────────────────────────────────────────────
 
   function openNote(note: Note) {
     const existing = tabs.find(
-      (t) => t.type === "note" && t.note.id === note.id,
+      (t) => t.type === "note" && t.refId === note.id,
     );
     if (existing) {
       setActiveTabId(existing.id);
@@ -61,23 +106,21 @@ export default function App() {
     openTab(makeNoteTab(note));
   }
 
-  function updateNote(tabId: string, updated: Note) {
-    setTabs((prev) =>
-      prev.map((t) =>
-        t.id === tabId && t.type === "note" ? { ...t, note: updated } : t,
-      ),
-    );
+  async function createNote(folderId: string | null) {
+    const note = await store.createNote(folderId);
+    openTab(makeNoteTab(note));
   }
 
-  function createNote() {
-    console.log("TODO: create new note and open in tab");
+  async function deleteNote(id: string) {
+    await store.deleteNote(id);
+    closeTabsByRefIds(new Set([id]));
   }
 
   // ── Folder actions ──────────────────────────────────────────────────────────
 
   function openFolder(folder: Folder) {
     const existing = tabs.find(
-      (t) => t.type === "folder" && t.folder.id === folder.id,
+      (t) => t.type === "folder" && t.refId === folder.id,
     );
     if (existing) {
       setActiveTabId(existing.id);
@@ -86,25 +129,25 @@ export default function App() {
     openTab(makeFolderTab(folder));
   }
 
-  function renameFolder(tabId: string, name: string) {
-    setTabs((prev) =>
-      prev.map((t) =>
-        t.id === tabId && t.type === "folder"
-          ? { ...t, folder: { ...t.folder, name } }
-          : t,
-      ),
-    );
+  async function createFolder(parentId: string | null) {
+    const folder = await store.createFolder(parentId);
+    openTab(makeFolderTab(folder));
   }
 
-  function createFolder() {
-    console.log("TODO: create new folder and open in tab");
-  }
-
-  function reorderTabs(reordered: Tab[]) {
-    setTabs(reordered);
+  async function deleteFolder(id: string) {
+    const { deletedNoteIds, deletedFolderIds } = await store.deleteFolder(id);
+    closeTabsByRefIds(new Set([...deletedNoteIds, ...deletedFolderIds]));
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
+
+  if (store.loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center text-sm text-muted-foreground">
+        Loading…
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider>
@@ -112,19 +155,27 @@ export default function App() {
         <TabView
           tabs={tabs}
           activeTabId={activeTabId}
-          allNotes={allNotes}
-          allFolders={allFolders}
+          notes={store.notes}
+          folders={store.folders}
+          notesById={notesById}
+          foldersById={foldersById}
           onTabSelect={setActiveTabId}
           onTabClose={closeTab}
           onTabsReorder={reorderTabs}
-          onNoteChange={updateNote}
-          onFolderRename={renameFolder}
-          onNoteSelect={(_tabId, note) => openNote(note)}
-          onNewNote={(_tabId) => createNote()}
+          onNoteChange={(note) => store.updateNote(note.id, note)}
+          onFolderRename={(folderId, name) =>
+            store.renameFolder(folderId, name)
+          }
+          onNoteSelect={openNote}
+          onFolderSelect={openFolder}
+          onNewNote={(folderId) => createNote(folderId)}
+          onDeleteNote={deleteNote}
+          onMoveNote={(noteId, folderId) => store.moveNote(noteId, folderId)}
+          onDeleteFolder={deleteFolder}
           onOpenNote={openNote}
           onOpenFolder={openFolder}
-          onCreateNote={createNote}
-          onCreateFolder={createFolder}
+          onCreateNote={() => createNote(null)}
+          onCreateFolder={() => createFolder(null)}
         />
       </div>
     </TooltipProvider>

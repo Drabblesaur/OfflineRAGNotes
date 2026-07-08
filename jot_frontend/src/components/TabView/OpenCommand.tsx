@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { FileText, FolderOpen, Plus } from "lucide-react";
 import {
   CommandDialog,
@@ -25,6 +24,11 @@ type Props = {
   onNewNote: () => void;
   onNewFolder: () => void;
 };
+
+function noteCountLabel(folder: Folder, notes: Note[]): string {
+  const count = notes.filter((n) => n.folderId === folder.id).length;
+  return `${count} ${count === 1 ? "note" : "notes"}`;
+}
 
 // ── OpenCommand ───────────────────────────────────────────────────────────────
 
@@ -114,8 +118,7 @@ export default function OpenCommand({
                   {folder.name || "Untitled Folder"}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {folder.notes.length}{" "}
-                  {folder.notes.length === 1 ? "note" : "notes"}
+                  {noteCountLabel(folder, notes)}
                 </span>
               </CommandItem>
             ))}

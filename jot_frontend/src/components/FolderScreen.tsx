@@ -6,11 +6,15 @@ import {
   Star,
   Tag,
   FileText,
+  FolderOpen,
   SquarePen,
   Search,
   ArrowUpDown,
   Check,
   X,
+  MoreVertical,
+  Trash2,
+  FolderInput,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,13 +27,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Note } from "@/components/NoteScreen";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import FolderPicker from "@/components/FolderPicker";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type Folder = {
   id: string;
+  parentId: string | null; // null = top-level
   name: string;
-  notes: Note[];
 };
 
 type View = "list" | "gallery";
@@ -46,9 +52,16 @@ const SORT_LABELS: Record<SortKey, string> = {
 
 type Props = {
   folder: Folder;
+  notes: Note[];
+  subfolders: Folder[];
+  allFolders: Folder[];
   onNoteSelect?: (note: Note) => void;
+  onFolderSelect?: (folder: Folder) => void;
   onFolderRename?: (name: string) => void;
   onNewNote?: () => void;
+  onDeleteNote?: (noteId: string) => void;
+  onMoveNote?: (noteId: string, folderId: string | null) => void;
+  onDeleteFolder?: () => void;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -95,67 +108,191 @@ function filterNotes(notes: Note[], query: string): Note[] {
   );
 }
 
+// ── Note actions menu (shared by list row + gallery card) ──────────────────────
+
+function NoteActionsMenu({
+  note,
+  allFolders,
+  onDelete,
+  onMove,
+  className,
+}: {
+  note: Note;
+  allFolders: Folder[];
+  onDelete?: (noteId: string) => void;
+  onMove?: (noteId: string, folderId: string | null) => void;
+  className?: string;
+}) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  if (!onDelete && !onMove) return null;
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity",
+        className,
+      )}
+    >
+      {onMove && (
+        <FolderPicker
+          folders={allFolders}
+          currentFolderId={note.folderId}
+          onSelect={(folderId) => onMove(note.id, folderId)}
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Move to folder"
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+          >
+            <FolderInput className="size-3.5" />
+          </Button>
+        </FolderPicker>
+      )}
+      {onDelete && (
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteOpen(true);
+            }}
+            aria-label="Delete note"
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+          <ConfirmDialog
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            title={`Delete "${note.title || "Untitled"}"?`}
+            description="This note will be permanently deleted."
+            onConfirm={() => {
+              setDeleteOpen(false);
+              onDelete(note.id);
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── List Row ──────────────────────────────────────────────────────────────────
 
-function NoteListRow({ note, onClick }: { note: Note; onClick: () => void }) {
+function NoteListRow({
+  note,
+  allFolders,
+  onClick,
+  onDelete,
+  onMove,
+}: {
+  note: Note;
+  allFolders: Folder[];
+  onClick: () => void;
+  onDelete?: (noteId: string) => void;
+  onMove?: (noteId: string, folderId: string | null) => void;
+}) {
   const preview = getPlainTextPreview(note);
 
   return (
-    <button
-      onClick={onClick}
+    <div
       className={cn(
-        "w-full text-left px-4 py-3 flex items-start gap-3",
+        "w-full flex items-start gap-3 px-4 py-3",
         "border-b last:border-b-0 border-border",
         "hover:bg-muted/50 transition-colors group",
       )}
     >
-      <FileText className="size-4 mt-0.5 shrink-0 text-muted-foreground/60 group-hover:text-muted-foreground transition-colors" />
+      <button
+        onClick={onClick}
+        className="flex-1 min-w-0 flex items-start gap-3 text-left"
+      >
+        <FileText className="size-4 mt-0.5 shrink-0 text-muted-foreground/60 group-hover:text-muted-foreground transition-colors" />
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-sm font-medium text-foreground truncate">
-            {note.title || "Untitled"}
-          </span>
-          {note.favorite && (
-            <Star className="size-3 shrink-0 fill-amber-400 text-amber-400" />
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="shrink-0">{format(note.date, "MMM d, yyyy")}</span>
-          {preview && (
-            <>
-              <span className="shrink-0">·</span>
-              <span className="truncate">{preview}</span>
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground/60">
-          <span>
-            Edited {format(note.lastEditedAt, "MMM d, yyyy 'at' h:mm a")}
-          </span>
-        </div>
-        {note.tags.length > 0 && (
-          <div className="flex gap-1 mt-1.5 flex-wrap">
-            {note.tags.slice(0, 3).map((tag) => (
-              <Badge
-                key={tag}
-                variant="secondary"
-                className="text-xs font-normal px-1.5 py-0 h-4"
-              >
-                {tag}
-              </Badge>
-            ))}
-            {note.tags.length > 3 && (
-              <span className="text-xs text-muted-foreground">
-                +{note.tags.length - 3}
-              </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-sm font-medium text-foreground truncate">
+              {note.title || "Untitled"}
+            </span>
+            {note.favorite && (
+              <Star className="size-3 shrink-0 fill-amber-400 text-amber-400" />
             )}
           </div>
-        )}
-      </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="shrink-0">
+              {format(note.date, "MMM d, yyyy")}
+            </span>
+            {preview && (
+              <>
+                <span className="shrink-0">·</span>
+                <span className="truncate">{preview}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground/60">
+            <span>
+              Edited {format(note.lastEditedAt, "MMM d, yyyy 'at' h:mm a")}
+            </span>
+          </div>
+          {note.tags.length > 0 && (
+            <div className="flex gap-1 mt-1.5 flex-wrap">
+              {note.tags.slice(0, 3).map((tag) => (
+                <Badge
+                  key={tag}
+                  variant="secondary"
+                  className="text-xs font-normal px-1.5 py-0 h-4"
+                >
+                  {tag}
+                </Badge>
+              ))}
+              {note.tags.length > 3 && (
+                <span className="text-xs text-muted-foreground">
+                  +{note.tags.length - 3}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </button>
+
+      <NoteActionsMenu
+        note={note}
+        allFolders={allFolders}
+        onDelete={onDelete}
+        onMove={onMove}
+      />
 
       <span className="text-xs text-muted-foreground/60 shrink-0 mt-0.5 whitespace-nowrap">
         {format(note.lastEditedAt, "h:mm a")}
+      </span>
+    </div>
+  );
+}
+
+// ── Folder Row ───────────────────────────────────────────────────────────────
+
+function FolderRow({
+  folder,
+  onClick,
+}: {
+  folder: Folder;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full text-left px-4 py-3 flex items-center gap-3",
+        "border-b last:border-b-0 border-border",
+        "hover:bg-muted/50 transition-colors group",
+      )}
+    >
+      <FolderOpen className="size-4 shrink-0 text-amber-500" />
+      <span className="text-sm font-medium text-foreground truncate">
+        {folder.name || "Untitled Folder"}
       </span>
     </button>
   );
@@ -165,57 +302,71 @@ function NoteListRow({ note, onClick }: { note: Note; onClick: () => void }) {
 
 function NoteGalleryCard({
   note,
+  allFolders,
   onClick,
+  onDelete,
+  onMove,
 }: {
   note: Note;
+  allFolders: Folder[];
   onClick: () => void;
+  onDelete?: (noteId: string) => void;
+  onMove?: (noteId: string, folderId: string | null) => void;
 }) {
   const preview = getPlainTextPreview(note);
 
   return (
-    <button
-      onClick={onClick}
+    <div
       className={cn(
-        "w-full text-left flex flex-col",
+        "w-full flex flex-col",
         "border rounded-lg bg-white hover:shadow-md transition-all duration-200",
-        "hover:-translate-y-0.5 group overflow-hidden",
+        "hover:-translate-y-0.5 group overflow-hidden relative",
       )}
     >
-      <div className="px-4 pt-4 pb-3 border-b border-border/60">
-        <div className="flex items-start gap-2">
-          <span className="flex-1 text-sm font-semibold text-foreground leading-tight line-clamp-2">
-            {note.title || "Untitled"}
-          </span>
-          {note.favorite && (
-            <Star className="size-3.5 shrink-0 mt-0.5 fill-amber-400 text-amber-400" />
+      <NoteActionsMenu
+        note={note}
+        allFolders={allFolders}
+        onDelete={onDelete}
+        onMove={onMove}
+        className="absolute top-2 right-2 z-10 bg-white/90 rounded-md"
+      />
+      <button onClick={onClick} className="w-full text-left flex flex-col">
+        <div className="px-4 pt-4 pb-3 border-b border-border/60">
+          <div className="flex items-start gap-2">
+            <span className="flex-1 text-sm font-semibold text-foreground leading-tight line-clamp-2">
+              {note.title || "Untitled"}
+            </span>
+            {note.favorite && (
+              <Star className="size-3.5 shrink-0 mt-0.5 fill-amber-400 text-amber-400" />
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+            <span>{format(note.date, "MMM d, yyyy")}</span>
+            {note.tags.length > 0 && (
+              <>
+                <span>·</span>
+                <Tag className="size-2.5" />
+                <span className="truncate">
+                  {note.tags.slice(0, 2).join(", ")}
+                  {note.tags.length > 2 && ` +${note.tags.length - 2}`}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="px-4 py-3 flex-1">
+          {preview ? (
+            <p className="text-xs text-muted-foreground line-clamp-4 leading-relaxed">
+              {preview}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground/40 italic">
+              No additional text
+            </p>
           )}
         </div>
-        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-          <span>{format(note.date, "MMM d, yyyy")}</span>
-          {note.tags.length > 0 && (
-            <>
-              <span>·</span>
-              <Tag className="size-2.5" />
-              <span className="truncate">
-                {note.tags.slice(0, 2).join(", ")}
-                {note.tags.length > 2 && ` +${note.tags.length - 2}`}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-      <div className="px-4 py-3 flex-1">
-        {preview ? (
-          <p className="text-xs text-muted-foreground line-clamp-4 leading-relaxed">
-            {preview}
-          </p>
-        ) : (
-          <p className="text-xs text-muted-foreground/40 italic">
-            No additional text
-          </p>
-        )}
-      </div>
-    </button>
+      </button>
+    </div>
   );
 }
 
@@ -223,15 +374,23 @@ function NoteGalleryCard({
 
 export default function FolderScreen({
   folder,
+  notes,
+  subfolders,
+  allFolders,
   onNoteSelect,
+  onFolderSelect,
   onFolderRename,
   onNewNote,
+  onDeleteNote,
+  onMoveNote,
+  onDeleteFolder,
 }: Props) {
   const [view, setView] = useState<View>("list");
   const [sort, setSort] = useState<SortKey>("lastEditedAt");
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [name, setName] = useState(folder.name);
+  const [deleteFolderOpen, setDeleteFolderOpen] = useState(false);
 
   function handleNameBlur() {
     const trimmed = name.trim();
@@ -255,9 +414,11 @@ export default function FolderScreen({
     setSearchOpen(false);
   }
 
-  const processedNotes = sortNotes(filterNotes(folder.notes, search), sort);
-  const isEmpty = folder.notes.length === 0;
-  const noResults = !isEmpty && processedNotes.length === 0;
+  const processedNotes = sortNotes(filterNotes(notes, search), sort);
+  const isEmpty = notes.length === 0 && subfolders.length === 0;
+  const noResults =
+    !isEmpty && search.trim() !== "" && processedNotes.length === 0;
+  const showNotesSection = notes.length > 0 && !noResults;
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -281,8 +442,8 @@ export default function FolderScreen({
             />
             <p className="text-xs text-muted-foreground mt-0.5 px-1">
               {processedNotes.length}
-              {search ? ` of ${folder.notes.length}` : ""}{" "}
-              {folder.notes.length === 1 ? "note" : "notes"}
+              {search ? ` of ${notes.length}` : ""}{" "}
+              {notes.length === 1 ? "note" : "notes"}
             </p>
           </div>
 
@@ -344,15 +505,54 @@ export default function FolderScreen({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                console.log("New note button pressed — folder:", folder.id);
-                onNewNote?.();
-              }}
+              onClick={() => onNewNote?.()}
               aria-label="New note"
               className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors"
             >
               <SquarePen className="size-4" />
             </Button>
+
+            {/* Folder actions (delete) */}
+            {onDeleteFolder && (
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label="Folder actions"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <MoreVertical className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => setDeleteFolderOpen(true)}
+                      className="gap-2"
+                    >
+                      <Trash2 className="size-3.5" />
+                      Delete folder
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <ConfirmDialog
+                  open={deleteFolderOpen}
+                  onOpenChange={setDeleteFolderOpen}
+                  title={`Delete "${folder.name || "Untitled Folder"}"?`}
+                  description={`This will permanently delete ${notes.length} ${
+                    notes.length === 1 ? "note" : "notes"
+                  } and ${subfolders.length} ${
+                    subfolders.length === 1 ? "subfolder" : "subfolders"
+                  } (including everything inside them).`}
+                  onConfirm={() => {
+                    setDeleteFolderOpen(false);
+                    onDeleteFolder();
+                  }}
+                />
+              </>
+            )}
 
             {/* View toggle */}
             <div className="flex items-center gap-0.5 border rounded-md p-0.5 bg-muted/40 ml-1">
@@ -428,47 +628,70 @@ export default function FolderScreen({
         </div>
       )}
 
-      {/* ── No search results state ── */}
-      {noResults && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground m-8">
-          <Search className="size-10 opacity-20" />
-          <p className="text-sm">No notes match "{search}"</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSearch("")}
-            className="text-xs"
-          >
-            Clear search
-          </Button>
-        </div>
-      )}
-
-      {/* ── List view ── */}
-      {!isEmpty && !noResults && view === "list" && (
+      {!isEmpty && (
         <div className="flex-1 overflow-y-auto">
-          {processedNotes.map((note) => (
-            <NoteListRow
-              key={note.id}
-              note={note}
-              onClick={() => onNoteSelect?.(note)}
-            />
-          ))}
-        </div>
-      )}
+          {/* ── Subfolders ── */}
+          {subfolders.length > 0 && (
+            <div>
+              {subfolders.map((sub) => (
+                <FolderRow
+                  key={sub.id}
+                  folder={sub}
+                  onClick={() => onFolderSelect?.(sub)}
+                />
+              ))}
+            </div>
+          )}
 
-      {/* ── Gallery view ── */}
-      {!isEmpty && !noResults && view === "gallery" && (
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {processedNotes.map((note) => (
-              <NoteGalleryCard
-                key={note.id}
-                note={note}
-                onClick={() => onNoteSelect?.(note)}
-              />
-            ))}
-          </div>
+          {/* ── No search results state ── */}
+          {noResults && (
+            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground m-8">
+              <Search className="size-10 opacity-20" />
+              <p className="text-sm">No notes match "{search}"</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearch("")}
+                className="text-xs"
+              >
+                Clear search
+              </Button>
+            </div>
+          )}
+
+          {/* ── List view ── */}
+          {showNotesSection && view === "list" && (
+            <div>
+              {processedNotes.map((note) => (
+                <NoteListRow
+                  key={note.id}
+                  note={note}
+                  allFolders={allFolders}
+                  onClick={() => onNoteSelect?.(note)}
+                  onDelete={onDeleteNote}
+                  onMove={onMoveNote}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* ── Gallery view ── */}
+          {showNotesSection && view === "gallery" && (
+            <div className="px-4 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {processedNotes.map((note) => (
+                  <NoteGalleryCard
+                    key={note.id}
+                    note={note}
+                    allFolders={allFolders}
+                    onClick={() => onNoteSelect?.(note)}
+                    onDelete={onDeleteNote}
+                    onMove={onMoveNote}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

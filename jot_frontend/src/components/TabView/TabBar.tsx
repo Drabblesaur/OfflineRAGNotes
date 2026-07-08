@@ -4,12 +4,16 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Tab } from "./Tabs";
 import { tabLabel } from "./Tabs";
+import type { Note } from "@/components/NoteScreen";
+import type { Folder } from "@/components/FolderScreen";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Props = {
   tabs: Tab[];
   activeTabId: string | null;
+  notesById: Map<string, Note>;
+  foldersById: Map<string, Folder>;
   onTabSelect: (id: string) => void;
   onTabClose: (id: string) => void;
   onTabsReorder: (reordered: Tab[]) => void;
@@ -21,6 +25,8 @@ type Props = {
 export default function TabBar({
   tabs,
   activeTabId,
+  notesById,
+  foldersById,
   onTabSelect,
   onTabClose,
   onTabsReorder,
@@ -98,7 +104,7 @@ export default function TabBar({
           const isActive = tab.id === activeTabId;
           const isDragging = tab.id === draggedId;
           const isDropTarget = tab.id === dragOverId;
-          const label = tabLabel(tab);
+          const label = tabLabel(tab, notesById, foldersById);
 
           return (
             <button
