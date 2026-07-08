@@ -45,7 +45,7 @@ export default function Editor({
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({ listKeymap: false }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Highlight,
       ListKeymap,

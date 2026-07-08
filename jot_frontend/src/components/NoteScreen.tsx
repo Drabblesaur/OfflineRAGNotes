@@ -1,7 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import type { JSONContent } from "@tiptap/core";
 import { format } from "date-fns";
-import { Star, Tag, X, Plus, Calendar, List } from "lucide-react";
+import {
+  Star,
+  Tag,
+  X,
+  Plus,
+  Calendar,
+  List,
+  FolderInput,
+  Trash2,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,27 +23,41 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import Editor from "@/components/editor";
 import type { ToCItem } from "@/components/editor";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import FolderPicker from "@/components/FolderPicker";
+import type { Folder } from "@/components/FolderScreen";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type Note = {
   id: string;
+  folderId: string | null; // null = unfiled/root
   title: string;
   contentJSON: JSONContent; // source of truth for the editor
   contentMd: string; // derived plain text for RAG embedding
   favorite: boolean;
   tags: string[];
-  date: Date;
+  date: Date; // user-editable note date
+  lastEditedAt: Date; // auto-stamped on every save, not user-controlled
 };
 
 type Props = {
   note: Note;
+  folders?: Folder[];
   onChange?: (updated: Note) => void;
+  onDelete?: () => void;
+  onMove?: (folderId: string | null) => void;
 };
 
 // ── NoteScreen ────────────────────────────────────────────────────────────────
 
-export default function NoteScreen({ note, onChange }: Props) {
+export default function NoteScreen({
+  note,
+  folders = [],
+  onChange,
+  onDelete,
+  onMove,
+}: Props) {
   const [title, setTitle] = useState(note.title);
   const [favorite, setFavorite] = useState(note.favorite);
   const [tags, setTags] = useState<string[]>(note.tags);
@@ -42,6 +65,7 @@ export default function NoteScreen({ note, onChange }: Props) {
   const [focused, setFocused] = useState(false);
   const [tocItems, setTocItems] = useState<ToCItem[]>([]);
   const [tocOpen, setTocOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const [tagInput, setTagInput] = useState("");
   const [tagInputOpen, setTagInputOpen] = useState(false);
@@ -94,7 +118,15 @@ export default function NoteScreen({ note, onChange }: Props) {
   }
 
   function patch(partial: Partial<Note>) {
-    onChange?.({ ...note, title, favorite, tags, date, ...partial });
+    onChange?.({
+      ...note,
+      title,
+      favorite,
+      tags,
+      date,
+      ...partial,
+      lastEditedAt: new Date(),
+    });
   }
 
   function handleTitleChange(value: string) {
@@ -172,7 +204,7 @@ export default function NoteScreen({ note, onChange }: Props) {
       <div className="flex items-start gap-2">
         <input
           className={cn(
-            "flex-1 text-4xl font-semibold tracking-tight bg-transparent border-none outline-none",
+            "flex-1 text-3xl font-semibold tracking-tight bg-transparent border-none outline-none",
             "placeholder:text-muted-foreground/40 text-foreground leading-tight",
           )}
           value={title}
@@ -195,6 +227,45 @@ export default function NoteScreen({ note, onChange }: Props) {
             )}
           />
         </Button>
+        {onMove && (
+          <FolderPicker
+            folders={folders}
+            currentFolderId={note.folderId}
+            onSelect={onMove}
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Move to folder"
+              className="mt-1 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <FolderInput className="size-5" />
+            </Button>
+          </FolderPicker>
+        )}
+        {onDelete && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDeleteOpen(true)}
+              aria-label="Delete note"
+              className="mt-1 shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <Trash2 className="size-5" />
+            </Button>
+            <ConfirmDialog
+              open={deleteOpen}
+              onOpenChange={setDeleteOpen}
+              title={`Delete "${title || "Untitled"}"?`}
+              description="This note will be permanently deleted."
+              onConfirm={() => {
+                setDeleteOpen(false);
+                onDelete();
+              }}
+            />
+          </>
+        )}
       </div>
 
       {/* ── Meta row: date + tags ── */}
@@ -321,11 +392,11 @@ export default function NoteScreen({ note, onChange }: Props) {
             className={cn(
               "hidden xl:block shrink-0 sticky top-6 overflow-hidden",
               "transition-all duration-300 ease-in-out",
-              tocOpen ? "w-44 opacity-100 ml-8" : "w-0 opacity-0 ml-0",
+              tocOpen ? "w-52 opacity-100 ml-8" : "w-0 opacity-0 ml-0",
             )}
             aria-hidden={!tocOpen}
           >
-            <aside className="w-44 flex flex-col gap-1 border rounded-md bg-white/95 backdrop-blur shadow-sm p-4">
+            <aside className="w-52 flex flex-col gap-1 border rounded-md bg-white/95 backdrop-blur shadow-sm p-4">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 On this page
               </p>
