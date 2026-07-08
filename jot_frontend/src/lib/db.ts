@@ -55,6 +55,21 @@ export async function deleteFolderRecord(id: string): Promise<void> {
   await db.delete("folders", id);
 }
 
+// ── Bulk operations ───────────────────────────────────────────────────────────
+
+// Wipes all notes and folders. Deliberately leaves the SEEDED_FLAG alone so
+// the demo content doesn't come back on next load — this is meant to leave
+// the user with a truly empty app, not reset it to the first-run state.
+export async function clearAll(): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(["notes", "folders"], "readwrite");
+  await Promise.all([
+    tx.objectStore("notes").clear(),
+    tx.objectStore("folders").clear(),
+    tx.done,
+  ]);
+}
+
 // ── Seeding ───────────────────────────────────────────────────────────────────
 
 // Runs once per browser profile — gated on localStorage rather than "store is

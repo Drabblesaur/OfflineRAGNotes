@@ -76,7 +76,7 @@ function renderGroup(group: ToolbarGroup, state: EditorState, editor: Editor) {
 export function ExpandedToolbar({ editor, groups, state }: Props) {
   return (
     <div className="hidden lg:block">
-      <div className="border rounded-md bg-white/95 backdrop-blur shadow-sm p-1 inline-flex items-center gap-1 whitespace-nowrap overflow-x-auto">
+      <div className="border border-line rounded-control bg-paper-card shadow-xs p-1 inline-flex items-center gap-1 whitespace-nowrap overflow-x-auto">
         {/* History */}
         <div className="flex gap-1">
           <ToolbarToggle

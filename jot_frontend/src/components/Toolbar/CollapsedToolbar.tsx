@@ -72,7 +72,7 @@ export function CollapsedToolbar({ editor, groups, state, track }: Props) {
 
   return (
     <div className="lg:hidden">
-      <div className="border rounded-md bg-white/95 backdrop-blur shadow-sm p-1 inline-flex items-center gap-1">
+      <div className="border border-line rounded-control bg-paper-card shadow-xs p-1 inline-flex items-center gap-1">
         {/* History */}
         <div className="flex gap-1">
           <ToolbarToggle

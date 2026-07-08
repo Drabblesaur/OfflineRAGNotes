@@ -1,9 +1,7 @@
-import { useState } from "react";
 import { FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import TabBar from "./TabBar";
-import OpenCommand from "./OpenCommand";
 import NoteScreen from "@/components/NoteScreen";
 import FolderScreen from "@/components/FolderScreen";
 import type { Note } from "@/components/NoteScreen";
@@ -32,11 +30,8 @@ type Props = {
   onDeleteNote?: (noteId: string) => void;
   onMoveNote?: (noteId: string, folderId: string | null) => void;
   onDeleteFolder?: (folderId: string) => void;
-  // Command dialog actions
-  onOpenNote: (note: Note) => void;
-  onOpenFolder: (folder: Folder) => void;
-  onCreateNote: () => void;
-  onCreateFolder: () => void;
+  // Opens the app-level command palette (owned by App.tsx, shared with Sidebar)
+  onOpenCommand: () => void;
 };
 
 // ── TabView ───────────────────────────────────────────────────────────────────
@@ -59,13 +54,8 @@ export default function TabView({
   onDeleteNote,
   onMoveNote,
   onDeleteFolder,
-  onOpenNote,
-  onOpenFolder,
-  onCreateNote,
-  onCreateFolder,
+  onOpenCommand,
 }: Props) {
-  const [commandOpen, setCommandOpen] = useState(false);
-
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
       {/* Tab bar with add button */}
@@ -77,19 +67,7 @@ export default function TabView({
         onTabSelect={onTabSelect}
         onTabClose={onTabClose}
         onTabsReorder={onTabsReorder}
-        onAddClick={() => setCommandOpen(true)}
-      />
-
-      {/* Command dialog */}
-      <OpenCommand
-        open={commandOpen}
-        onOpenChange={setCommandOpen}
-        notes={notes}
-        folders={folders}
-        onOpenNote={onOpenNote}
-        onOpenFolder={onOpenFolder}
-        onNewNote={onCreateNote}
-        onNewFolder={onCreateFolder}
+        onAddClick={onOpenCommand}
       />
 
       {/* Empty state */}
@@ -98,7 +76,7 @@ export default function TabView({
           <FileText className="size-10 opacity-20" />
           <p className="text-sm">No open tabs</p>
           <button
-            onClick={() => setCommandOpen(true)}
+            onClick={onOpenCommand}
             className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
           >
             Open something

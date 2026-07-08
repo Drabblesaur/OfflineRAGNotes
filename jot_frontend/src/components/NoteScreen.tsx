@@ -204,7 +204,7 @@ export default function NoteScreen({
       <div className="flex items-start gap-2">
         <input
           className={cn(
-            "flex-1 text-3xl font-semibold tracking-tight bg-transparent border-none outline-none",
+            "flex-1 font-serif text-3xl font-semibold tracking-[-0.015em] bg-transparent border-none outline-none",
             "placeholder:text-muted-foreground/40 text-foreground leading-tight",
           )}
           value={title}
@@ -276,7 +276,7 @@ export default function NoteScreen({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 gap-1.5 text-muted-foreground hover:text-foreground font-normal"
+              className="h-7 px-2 gap-1.5 text-muted-foreground hover:text-foreground font-mono font-normal"
             >
               <Calendar className="size-3.5" />
               {format(date, "MMM d, yyyy")}
@@ -396,8 +396,8 @@ export default function NoteScreen({
             )}
             aria-hidden={!tocOpen}
           >
-            <aside className="w-52 flex flex-col gap-1 border rounded-md bg-white/95 backdrop-blur shadow-sm p-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <aside className="w-52 flex flex-col gap-1 border border-line rounded-card bg-paper-card shadow-xs p-4">
+              <p className="font-mono text-[11px] text-ink-500 uppercase tracking-widest mb-2">
                 On this page
               </p>
               {tocItems.map((item) => (

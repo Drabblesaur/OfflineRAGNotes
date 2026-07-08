@@ -93,7 +93,7 @@ export default function TabBar({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex items-end border-b bg-muted/30 shrink-0">
+    <div className="flex items-end border-b border-line bg-paper-panel shrink-0">
       {/* Scrollable tab strip */}
       <div
         ref={scrollRef}
@@ -122,8 +122,8 @@ export default function TabBar({
                 "transition-all duration-150 max-w-[180px] min-w-[100px]",
                 "cursor-grab active:cursor-grabbing select-none",
                 isActive
-                  ? "bg-white text-foreground border-border -mb-px z-10 shadow-sm"
-                  : "bg-transparent text-muted-foreground border-transparent hover:bg-white/60 hover:text-foreground",
+                  ? "bg-paper-card text-ink-900 border-line -mb-px z-10"
+                  : "bg-transparent text-ink-500 border-transparent hover:bg-paper-card/60 hover:text-ink-900",
                 // Dim the tab being dragged
                 isDragging && "opacity-40",
                 // Show a left border highlight on the drop target

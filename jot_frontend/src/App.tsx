@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TooltipProvider } from "./components/ui/tooltip";
 import TabView from "./components/TabView";
+import Sidebar from "./components/Sidebar";
+import OpenCommand from "./components/TabView/OpenCommand";
+import Settings from "./components/Settings";
 import type { Tab } from "./components/TabView/Tabs";
 import type { Note } from "./components/NoteScreen";
 import type { Folder } from "./components/FolderScreen";
 import { useNotesStore } from "./hooks/useNotesStore";
+import { useTheme } from "./hooks/useTheme";
 import { loadSession, saveSession } from "./lib/session";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -25,11 +29,18 @@ function makeFolderTab(folder: Folder): Tab {
 
 export default function App() {
   const store = useNotesStore();
+  const { theme, setTheme } = useTheme();
 
   const [tabs, setTabs] = useState<Tab[]>(() => loadSession()?.tabs ?? []);
   const [activeTabId, setActiveTabId] = useState<string | null>(
     () => loadSession()?.activeTabId ?? null,
   );
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
+  const activeFolderId = activeTab?.type === "folder" ? activeTab.refId : null;
+  const activeNoteId = activeTab?.type === "note" ? activeTab.refId : null;
 
   const notesById = useMemo(
     () => new Map(store.notes.map((n) => [n.id, n])),
@@ -139,6 +150,12 @@ export default function App() {
     closeTabsByRefIds(new Set([...deletedNoteIds, ...deletedFolderIds]));
   }
 
+  function toggleFavorite(noteId: string) {
+    const note = notesById.get(noteId);
+    if (!note) return;
+    store.updateNote(noteId, { favorite: !note.favorite });
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   if (store.loading) {
@@ -151,33 +168,76 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      <div className="h-screen w-screen overflow-hidden">
-        <TabView
-          tabs={tabs}
-          activeTabId={activeTabId}
-          notes={store.notes}
+      <div className="h-screen w-screen overflow-hidden flex">
+        <Sidebar
           folders={store.folders}
-          notesById={notesById}
-          foldersById={foldersById}
-          onTabSelect={setActiveTabId}
-          onTabClose={closeTab}
-          onTabsReorder={reorderTabs}
-          onNoteChange={(note) => store.updateNote(note.id, note)}
-          onFolderRename={(folderId, name) =>
+          notes={store.notes}
+          activeFolderId={activeFolderId}
+          activeNoteId={activeNoteId}
+          onOpenFolder={openFolder}
+          onOpenNote={openNote}
+          onNewNote={createNote}
+          onNewFolder={createFolder}
+          onRenameFolder={(folderId, name) =>
             store.renameFolder(folderId, name)
           }
-          onNoteSelect={openNote}
-          onFolderSelect={openFolder}
-          onNewNote={(folderId) => createNote(folderId)}
-          onDeleteNote={deleteNote}
-          onMoveNote={(noteId, folderId) => store.moveNote(noteId, folderId)}
+          onMoveFolder={(folderId, parentId) =>
+            store.moveFolder(folderId, parentId)
+          }
           onDeleteFolder={deleteFolder}
-          onOpenNote={openNote}
-          onOpenFolder={openFolder}
-          onCreateNote={() => createNote(null)}
-          onCreateFolder={() => createFolder(null)}
+          onToggleFavorite={toggleFavorite}
+          onMoveNote={(noteId, folderId) => store.moveNote(noteId, folderId)}
+          onDeleteNote={deleteNote}
+          onOpenCommand={() => setCommandOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
+        <div className="flex-1 min-w-0">
+          <TabView
+            tabs={tabs}
+            activeTabId={activeTabId}
+            notes={store.notes}
+            folders={store.folders}
+            notesById={notesById}
+            foldersById={foldersById}
+            onTabSelect={setActiveTabId}
+            onTabClose={closeTab}
+            onTabsReorder={reorderTabs}
+            onNoteChange={(note) => store.updateNote(note.id, note)}
+            onFolderRename={(folderId, name) =>
+              store.renameFolder(folderId, name)
+            }
+            onNoteSelect={openNote}
+            onFolderSelect={openFolder}
+            onNewNote={(folderId) => createNote(folderId)}
+            onDeleteNote={deleteNote}
+            onMoveNote={(noteId, folderId) =>
+              store.moveNote(noteId, folderId)
+            }
+            onDeleteFolder={deleteFolder}
+            onOpenCommand={() => setCommandOpen(true)}
+          />
+        </div>
       </div>
+
+      <OpenCommand
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        notes={store.notes}
+        folders={store.folders}
+        onOpenNote={openNote}
+        onOpenFolder={openFolder}
+        onNewNote={() => createNote(null)}
+        onNewFolder={() => createFolder(null)}
+      />
+
+      <Settings
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        notes={store.notes}
+        folders={store.folders}
+        theme={theme}
+        onThemeChange={setTheme}
+      />
     </TooltipProvider>
   );
 }

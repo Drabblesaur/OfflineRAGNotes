@@ -123,8 +123,8 @@ export default function Editor({
         <Toolbar editor={editor} onMenuOpenChange={handleMenuOpenChange} />
       </div>
 
-      <div className="w-full border rounded-lg flex">
-        <div className="drag-handle-gutter relative w-8 shrink-0 rounded-l-lg bg-gray-50 border-r border-gray-100" />
+      <div className="w-full border border-line rounded-card flex">
+        <div className="drag-handle-gutter relative w-8 shrink-0 rounded-l-card bg-paper-panel border-r border-line" />
         <div className="flex-1 min-w-0">
           <EditorContent editor={editor} />
         </div>

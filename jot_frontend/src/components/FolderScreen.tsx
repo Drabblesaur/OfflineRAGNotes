@@ -202,8 +202,8 @@ function NoteListRow({
     <div
       className={cn(
         "w-full flex items-start gap-3 px-4 py-3",
-        "border-b last:border-b-0 border-border",
-        "hover:bg-muted/50 transition-colors group",
+        "border-b last:border-b-0 border-line",
+        "hover:bg-paper-panel transition-colors group",
       )}
     >
       <button
@@ -214,25 +214,25 @@ function NoteListRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-sm font-medium text-foreground truncate">
+            <span className="font-serif text-sm font-medium text-foreground truncate">
               {note.title || "Untitled"}
             </span>
             {note.favorite && (
               <Star className="size-3 shrink-0 fill-amber-400 text-amber-400" />
             )}
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
             <span className="shrink-0">
               {format(note.date, "MMM d, yyyy")}
             </span>
             {preview && (
               <>
                 <span className="shrink-0">·</span>
-                <span className="truncate">{preview}</span>
+                <span className="font-sans truncate">{preview}</span>
               </>
             )}
           </div>
-          <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground/60">
+          <div className="flex items-center gap-1 mt-0.5 font-mono text-xs text-muted-foreground/60">
             <span>
               Edited {format(note.lastEditedAt, "MMM d, yyyy 'at' h:mm a")}
             </span>
@@ -249,7 +249,7 @@ function NoteListRow({
                 </Badge>
               ))}
               {note.tags.length > 3 && (
-                <span className="text-xs text-muted-foreground">
+                <span className="font-mono text-xs text-muted-foreground">
                   +{note.tags.length - 3}
                 </span>
               )}
@@ -265,7 +265,7 @@ function NoteListRow({
         onMove={onMove}
       />
 
-      <span className="text-xs text-muted-foreground/60 shrink-0 mt-0.5 whitespace-nowrap">
+      <span className="font-mono text-xs text-muted-foreground/60 shrink-0 mt-0.5 whitespace-nowrap">
         {format(note.lastEditedAt, "h:mm a")}
       </span>
     </div>
@@ -286,8 +286,8 @@ function FolderRow({
       onClick={onClick}
       className={cn(
         "w-full text-left px-4 py-3 flex items-center gap-3",
-        "border-b last:border-b-0 border-border",
-        "hover:bg-muted/50 transition-colors group",
+        "border-b last:border-b-0 border-line",
+        "hover:bg-paper-panel transition-colors group",
       )}
     >
       <FolderOpen className="size-4 shrink-0 text-amber-500" />
@@ -319,8 +319,8 @@ function NoteGalleryCard({
     <div
       className={cn(
         "w-full flex flex-col",
-        "border rounded-lg bg-white hover:shadow-md transition-all duration-200",
-        "hover:-translate-y-0.5 group overflow-hidden relative",
+        "border border-line rounded-card bg-paper-card transition-colors",
+        "group overflow-hidden relative",
       )}
     >
       <NoteActionsMenu
@@ -328,19 +328,19 @@ function NoteGalleryCard({
         allFolders={allFolders}
         onDelete={onDelete}
         onMove={onMove}
-        className="absolute top-2 right-2 z-10 bg-white/90 rounded-md"
+        className="absolute top-2 right-2 z-10 bg-paper-card/90 rounded-md"
       />
       <button onClick={onClick} className="w-full text-left flex flex-col">
-        <div className="px-4 pt-4 pb-3 border-b border-border/60">
+        <div className="px-4 pt-4 pb-3 border-b border-line/60">
           <div className="flex items-start gap-2">
-            <span className="flex-1 text-sm font-semibold text-foreground leading-tight line-clamp-2">
+            <span className="flex-1 font-serif text-sm font-semibold text-foreground leading-tight line-clamp-2">
               {note.title || "Untitled"}
             </span>
             {note.favorite && (
               <Star className="size-3.5 shrink-0 mt-0.5 fill-amber-400 text-amber-400" />
             )}
           </div>
-          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 mt-2 font-mono text-xs text-muted-foreground">
             <span>{format(note.date, "MMM d, yyyy")}</span>
             {note.tags.length > 0 && (
               <>
@@ -356,7 +356,7 @@ function NoteGalleryCard({
         </div>
         <div className="px-4 py-3 flex-1">
           {preview ? (
-            <p className="text-xs text-muted-foreground line-clamp-4 leading-relaxed">
+            <p className="text-xs text-ink-700 line-clamp-4 leading-relaxed">
               {preview}
             </p>
           ) : (
@@ -423,7 +423,7 @@ export default function FolderScreen({
   return (
     <div className="flex flex-col h-full w-full">
       {/* ── Header ── */}
-      <div className="border-b bg-white/80 backdrop-blur sticky top-0 z-10">
+      <div className="border-b border-line bg-paper-panel sticky top-0 z-10">
         <div className="flex items-center justify-between px-4 py-3">
           {/* Folder name + count */}
           <div>
@@ -434,13 +434,13 @@ export default function FolderScreen({
               onKeyDown={handleNameKeyDown}
               aria-label="Folder name"
               className={cn(
-                "text-xl font-semibold text-foreground tracking-tight bg-transparent",
+                "font-serif text-xl font-semibold text-foreground tracking-[-0.015em] bg-transparent",
                 "border-none outline-none w-full",
                 "placeholder:text-muted-foreground/40",
-                "hover:bg-muted/40 focus:bg-muted/40 rounded px-1 -mx-1 transition-colors",
+                "hover:bg-paper-card focus:bg-paper-card rounded px-1 -mx-1 transition-colors",
               )}
             />
-            <p className="text-xs text-muted-foreground mt-0.5 px-1">
+            <p className="font-mono text-xs text-muted-foreground mt-0.5 px-1">
               {processedNotes.length}
               {search ? ` of ${notes.length}` : ""}{" "}
               {notes.length === 1 ? "note" : "notes"}
@@ -475,7 +475,7 @@ export default function FolderScreen({
                   size="sm"
                   aria-label="Sort notes"
                   className={cn(
-                    "h-8 px-2 gap-1.5 transition-colors text-xs font-normal",
+                    "h-8 px-2 gap-1.5 transition-colors font-mono text-xs font-normal",
                     sort !== "lastEditedAt"
                       ? "text-foreground"
                       : "text-muted-foreground hover:text-foreground",
@@ -555,7 +555,7 @@ export default function FolderScreen({
             )}
 
             {/* View toggle */}
-            <div className="flex items-center gap-0.5 border rounded-md p-0.5 bg-muted/40 ml-1">
+            <div className="flex items-center gap-0.5 border border-line rounded-control p-0.5 bg-paper-panel ml-1">
               <Button
                 variant="ghost"
                 size="sm"
@@ -565,7 +565,7 @@ export default function FolderScreen({
                 className={cn(
                   "h-7 w-7 p-0 transition-colors",
                   view === "list"
-                    ? "bg-white shadow-sm text-foreground"
+                    ? "bg-paper-card text-foreground"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -580,7 +580,7 @@ export default function FolderScreen({
                 className={cn(
                   "h-7 w-7 p-0 transition-colors",
                   view === "gallery"
-                    ? "bg-white shadow-sm text-foreground"
+                    ? "bg-paper-card text-foreground"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
