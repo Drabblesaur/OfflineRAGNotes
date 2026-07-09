@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sun, Moon, Monitor, Download, Trash2, RefreshCw } from "lucide-react";
+import { Sun, Moon, Monitor, Download, FolderOpen, RefreshCw } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { clearAll } from "@/lib/db";
+import { clearVaultPath } from "@/lib/vaultPath";
 import { useIndexStatus } from "@/hooks/useIndexStatus";
 import { describeIndexStatus } from "@/lib/indexStatus";
 import type { Theme } from "@/hooks/useTheme";
@@ -55,9 +55,10 @@ export default function Settings({
     URL.revokeObjectURL(url);
   }
 
-  function handleClearAll() {
+  function handleSwitchVault() {
     setClearOpen(false);
-    void clearAll().then(() => window.location.reload());
+    clearVaultPath();
+    window.location.reload();
   }
 
   return (
@@ -110,10 +111,10 @@ export default function Settings({
                 variant="outline"
                 size="sm"
                 onClick={() => setClearOpen(true)}
-                className="gap-1.5 text-destructive hover:text-destructive"
+                className="gap-1.5"
               >
-                <Trash2 className="size-3.5" />
-                Clear all data
+                <FolderOpen className="size-3.5" />
+                Switch vault
               </Button>
             </SettingsSection>
 
@@ -144,10 +145,10 @@ export default function Settings({
       <ConfirmDialog
         open={clearOpen}
         onOpenChange={setClearOpen}
-        title="Clear all data?"
-        description="This permanently deletes all notes and folders from this browser. This can't be undone."
-        confirmLabel="Clear all data"
-        onConfirm={handleClearAll}
+        title="Switch to a different vault?"
+        description="This closes the current notes folder and lets you choose another one. Nothing on disk is deleted."
+        confirmLabel="Switch vault"
+        onConfirm={handleSwitchVault}
       />
     </>
   );

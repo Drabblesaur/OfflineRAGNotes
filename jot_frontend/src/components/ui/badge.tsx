@@ -10,8 +10,8 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "rounded-full px-2 py-0.5 text-xs bg-primary text-primary-foreground [a&]:hover:bg-accent-ink",
-        // Tag chip recipe (DESIGN_SYSTEM.md §6) — used for note tags.
+          "rounded-full px-2 py-0.5 text-xs bg-primary text-primary-foreground [a&]:hover:opacity-90",
+        // Note tags use TagChip (category-colored), not this variant.
         secondary:
           "rounded-md px-2.5 py-1 text-xs font-mono bg-paper-panel text-ink-700 [a&]:hover:bg-line",
         destructive:

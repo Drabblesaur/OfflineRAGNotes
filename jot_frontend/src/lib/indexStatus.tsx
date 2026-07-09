@@ -25,7 +25,7 @@ export function describeIndexStatus(status: IndexStatus): IndexStatusDescription
       };
     case "idle":
       return {
-        icon: dot("bg-accent"),
+        icon: dot("bg-cat-sage"),
         label: "Up to date",
         tooltip: status.lastIndexedAt
           ? `Last indexed ${formatDistanceToNow(status.lastIndexedAt, { addSuffix: true })}`
@@ -33,7 +33,7 @@ export function describeIndexStatus(status: IndexStatus): IndexStatusDescription
       };
     case "indexing":
       return {
-        icon: dot("bg-accent animate-pulse"),
+        icon: dot("bg-cat-sage animate-pulse"),
         label: `Indexing… ${status.done}/${status.total}`,
         tooltip: "Building the search index.",
       };

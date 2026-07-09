@@ -11,4 +11,15 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Tauri-specific settings: https://v2.tauri.app/start/frontend/vite/
+  clearScreen: false,
+  server: {
+    strictPort: true,
+    port: 5173,
+    host: process.env.TAURI_DEV_HOST || false,
+    watch: {
+      ignored: ["**/src-tauri/**"],
+    },
+  },
+  envPrefix: ["VITE_", "TAURI_ENV_*"],
 })

@@ -247,11 +247,11 @@ function SidebarRow({
             className={cn(
               "w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[10px] text-sm text-left transition-colors",
               active
-                ? "bg-accent-soft border border-accent/20 text-ink-900 font-medium"
+                ? "bg-ink-900/8 border border-ink-900/15 text-ink-900 font-medium"
                 : "border border-transparent text-ink-700 hover:bg-paper-panel hover:text-ink-900",
             )}
           >
-            {active && <span className="size-1.5 rounded-full bg-accent shrink-0" />}
+            {active && <span className="size-1.5 rounded-full bg-ink-900 shrink-0" />}
             {icon}
             <span className="truncate">{note.title || "Untitled"}</span>
           </button>

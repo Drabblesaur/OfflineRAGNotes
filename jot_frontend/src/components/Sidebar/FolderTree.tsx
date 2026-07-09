@@ -218,7 +218,7 @@ function FolderNode({
             className={cn(
               "w-full flex items-center gap-1 pr-2 py-1.5 rounded-[10px] text-sm text-left transition-colors group",
               isActive
-                ? "bg-accent-soft border border-accent/20 text-ink-900 font-medium"
+                ? "bg-ink-900/8 border border-ink-900/15 text-ink-900 font-medium"
                 : "border border-transparent text-ink-700 hover:bg-paper-panel hover:text-ink-900",
             )}
           >

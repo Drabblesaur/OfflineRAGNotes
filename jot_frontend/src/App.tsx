@@ -4,6 +4,7 @@ import TabView from "./components/TabView";
 import Sidebar from "./components/Sidebar";
 import OpenCommand from "./components/TabView/OpenCommand";
 import Settings from "./components/Settings";
+import VaultPicker from "./components/Onboarding/VaultPicker";
 import type { Tab } from "./components/TabView/Tabs";
 import type { Note } from "./components/NoteScreen";
 import type { Folder } from "./components/FolderScreen";
@@ -100,6 +101,22 @@ export default function App() {
     });
   }
 
+  // Renaming/moving a folder changes its id (folder ids are vault-relative
+  // paths) — any open folder tab pointing at the old path needs its refId
+  // rewritten to the new one, or it'd silently stop resolving to anything.
+  // Note tabs need no equivalent repair: note ids are stable UUIDs in
+  // frontmatter, independent of the file's path.
+  function repairFolderTabs(pathMap: Map<string, string>) {
+    if (pathMap.size === 0) return;
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.type === "folder" && pathMap.has(t.refId)
+          ? { ...t, refId: pathMap.get(t.refId)! }
+          : t,
+      ),
+    );
+  }
+
   function reorderTabs(reordered: Tab[]) {
     setTabs(reordered);
   }
@@ -150,6 +167,16 @@ export default function App() {
     closeTabsByRefIds(new Set([...deletedNoteIds, ...deletedFolderIds]));
   }
 
+  async function renameFolder(id: string, name: string) {
+    const pathMap = await store.renameFolder(id, name);
+    repairFolderTabs(pathMap);
+  }
+
+  async function moveFolder(id: string, parentId: string | null) {
+    const pathMap = await store.moveFolder(id, parentId);
+    repairFolderTabs(pathMap);
+  }
+
   function toggleFavorite(noteId: string) {
     const note = notesById.get(noteId);
     if (!note) return;
@@ -157,6 +184,10 @@ export default function App() {
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
+
+  if (!store.vaultPath) {
+    return <VaultPicker onVaultSelected={store.selectVault} />;
+  }
 
   if (store.loading) {
     return (
@@ -178,12 +209,8 @@ export default function App() {
           onOpenNote={openNote}
           onNewNote={createNote}
           onNewFolder={createFolder}
-          onRenameFolder={(folderId, name) =>
-            store.renameFolder(folderId, name)
-          }
-          onMoveFolder={(folderId, parentId) =>
-            store.moveFolder(folderId, parentId)
-          }
+          onRenameFolder={renameFolder}
+          onMoveFolder={moveFolder}
           onDeleteFolder={deleteFolder}
           onToggleFavorite={toggleFavorite}
           onMoveNote={(noteId, folderId) => store.moveNote(noteId, folderId)}
@@ -203,9 +230,7 @@ export default function App() {
             onTabClose={closeTab}
             onTabsReorder={reorderTabs}
             onNoteChange={(note) => store.updateNote(note.id, note)}
-            onFolderRename={(folderId, name) =>
-              store.renameFolder(folderId, name)
-            }
+            onFolderRename={renameFolder}
             onNoteSelect={openNote}
             onFolderSelect={openFolder}
             onNewNote={(folderId) => createNote(folderId)}

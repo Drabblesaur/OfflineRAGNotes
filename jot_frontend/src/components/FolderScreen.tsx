@@ -17,7 +17,7 @@ import {
   FolderInput,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import TagChip from "@/components/TagChip";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -33,8 +33,8 @@ import FolderPicker from "@/components/FolderPicker";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type Folder = {
-  id: string;
-  parentId: string | null; // null = top-level
+  id: string; // the directory's own vault-relative path
+  parentId: string | null; // parent directory's vault-relative path, or null = top-level
   name: string;
 };
 
@@ -66,18 +66,17 @@ type Props = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Cheap markdown-punctuation strip, not a parser — good enough for a list/
+// gallery preview snippet. Pulls from the first few non-empty lines so a
+// note that opens with a heading still shows something after it.
 function getPlainTextPreview(note: Note): string {
-  if (!note.contentJSON?.content) return "";
-  const extractText = (nodes: any[]): string =>
-    nodes
-      .flatMap((node) => {
-        if (node.type === "text") return node.text ?? "";
-        if (node.content) return extractText(node.content);
-        return "";
-      })
-      .join(" ")
-      .trim();
-  return extractText(note.contentJSON.content);
+  return note.bodyMd
+    .split("\n")
+    .map((line) => line.replace(/^\s*(#{1,6}|[-*+]|\d+\.|>)\s*/, "").trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" ")
+    .trim();
 }
 
 function sortNotes(notes: Note[], key: SortKey): Note[] {
@@ -240,13 +239,7 @@ function NoteListRow({
           {note.tags.length > 0 && (
             <div className="flex gap-1 mt-1.5 flex-wrap">
               {note.tags.slice(0, 3).map((tag) => (
-                <Badge
-                  key={tag}
-                  variant="secondary"
-                  className="text-xs font-normal px-1.5 py-0 h-4"
-                >
-                  {tag}
-                </Badge>
+                <TagChip key={tag} tag={tag} size="sm" />
               ))}
               {note.tags.length > 3 && (
                 <span className="font-mono text-xs text-muted-foreground">

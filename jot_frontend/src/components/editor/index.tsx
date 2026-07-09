@@ -1,9 +1,9 @@
 import { useEditor, EditorContent } from "@tiptap/react";
-import type { JSONContent } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
 import Highlight from "@tiptap/extension-highlight";
 import { ListKeymap } from "@tiptap/extension-list-keymap";
+import { Markdown } from "@tiptap/markdown";
 import GlobalDragHandle from "tiptap-extension-global-drag-handle";
 import {
   TableOfContents,
@@ -26,8 +26,9 @@ type Props = {
   /** Controlled by NoteScreen's pointer listener — Editor does not own this. */
   focused: boolean;
   noteId: string;
-  content: JSONContent;
-  onContentChange: (content: JSONContent) => void;
+  /** Markdown source — the Markdown extension parses/serializes it. */
+  content: string;
+  onContentChange: (content: string) => void;
   onToCChange?: (items: ToCItem[]) => void;
   onMenuOpenChange?: (open: boolean) => void;
 };
@@ -49,6 +50,7 @@ export default function Editor({
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Highlight,
       ListKeymap,
+      Markdown,
       GlobalDragHandle.configure({
         dragHandleWidth: 20,
         scrollTreshold: 100,
@@ -71,6 +73,7 @@ export default function Editor({
     // Initial content from the note. Tiptap treats this as a seed — it is NOT
     // a controlled value. Note switching is handled via setContent() below.
     content,
+    contentType: "markdown",
     editorProps: {
       attributes: {
         class:
@@ -78,7 +81,7 @@ export default function Editor({
       },
     },
     onUpdate: ({ editor }) => {
-      onContentChange(editor.getJSON());
+      onContentChange(editor.getMarkdown());
     },
     // No onFocus — NoteScreen's pointer listener owns focused state entirely.
     // Relying on tiptap's onFocus caused spurious refocus when toolbar buttons
@@ -95,7 +98,7 @@ export default function Editor({
     prevNoteId.current = noteId;
     // false = don't emit an onUpdate, so we don't immediately write back
     // the content we just set.
-    editor.commands.setContent(content, { emitUpdate: false });
+    editor.commands.setContent(content, { emitUpdate: false, contentType: "markdown" });
   }, [noteId, editor]);
 
   const handleMenuOpenChange = (open: boolean) => {

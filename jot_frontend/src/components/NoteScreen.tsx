@@ -1,17 +1,15 @@
 import { useState, useRef, useEffect } from "react";
-import type { JSONContent } from "@tiptap/core";
 import { format } from "date-fns";
 import {
   Star,
   Tag,
-  X,
   Plus,
   Calendar,
   List,
   FolderInput,
   Trash2,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import TagChip from "@/components/TagChip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,11 +28,10 @@ import type { Folder } from "@/components/FolderScreen";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type Note = {
-  id: string;
-  folderId: string | null; // null = unfiled/root
-  title: string;
-  contentJSON: JSONContent; // source of truth for the editor
-  contentMd: string; // derived plain text for RAG embedding
+  id: string; // stable UUID, lives in frontmatter — independent of file path
+  folderId: string | null; // parent directory's vault-relative path, or null = vault root
+  title: string; // derived from the filename (basename minus .md), not stored in frontmatter
+  bodyMd: string; // markdown body — source of truth for the editor
   favorite: boolean;
   tags: string[];
   date: Date; // user-editable note date
@@ -59,6 +56,10 @@ export default function NoteScreen({
   onMove,
 }: Props) {
   const [title, setTitle] = useState(note.title);
+  const [titleFocused, setTitleFocused] = useState(false);
+  // Tracks the note.title we've last synced `title` from, so the render-phase
+  // adjustment below fires only on an actual prop change, not every render.
+  const [syncedTitle, setSyncedTitle] = useState(note.title);
   const [favorite, setFavorite] = useState(note.favorite);
   const [tags, setTags] = useState<string[]>(note.tags);
   const [date, setDate] = useState<Date>(note.date);
@@ -110,6 +111,17 @@ export default function NoteScreen({
       document.removeEventListener("pointerdown", onPointerDown, true);
   }, []);
 
+  // Title is the filename now, so the store can silently adjust it on write
+  // (collision auto-suffix, e.g. "Notes" -> "Notes 2"). Adjusted during
+  // render (React's documented pattern for "sync state from a changed prop")
+  // rather than in an effect, and only when note.title actually changed —
+  // and never while the user is still typing in the field, or we'd clobber
+  // their in-progress edit.
+  if (note.title !== syncedTitle) {
+    setSyncedTitle(note.title);
+    if (!titleFocused) setTitle(note.title);
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   function handleMenuOpenChange(open: boolean) {
@@ -137,15 +149,16 @@ export default function NoteScreen({
   }
 
   function handleTitleBlur() {
+    setTitleFocused(false);
     patch({ title });
   }
 
-  function handleContentChange(contentJSON: JSONContent) {
+  function handleContentChange(bodyMd: string) {
     // Debounce saves so onChange fires ~500ms after the user stops typing,
     // rather than on every keystroke.
     if (saveContentTimer.current) clearTimeout(saveContentTimer.current);
     saveContentTimer.current = setTimeout(() => {
-      patch({ contentJSON });
+      patch({ bodyMd });
     }, 500);
   }
 
@@ -209,6 +222,7 @@ export default function NoteScreen({
           )}
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
+          onFocus={() => setTitleFocused(true)}
           onBlur={handleTitleBlur}
           placeholder="Untitled"
           aria-label="Note title"
@@ -299,20 +313,7 @@ export default function NoteScreen({
           <Tag className="size-3.5 shrink-0" />
 
           {tags.map((tag) => (
-            <Badge
-              key={tag}
-              variant="secondary"
-              className="gap-1 pr-1 text-xs font-normal"
-            >
-              {tag}
-              <button
-                onClick={() => removeTag(tag)}
-                aria-label={`Remove tag ${tag}`}
-                className="rounded-full hover:text-destructive transition-colors"
-              >
-                <X className="size-2.5" />
-              </button>
-            </Badge>
+            <TagChip key={tag} tag={tag} onRemove={() => removeTag(tag)} />
           ))}
 
           {tagInputOpen ? (
@@ -378,7 +379,7 @@ export default function NoteScreen({
           <Editor
             focused={focused}
             noteId={note.id}
-            content={note.contentJSON}
+            content={note.bodyMd}
             onContentChange={handleContentChange}
             onToCChange={setTocItems}
             onMenuOpenChange={handleMenuOpenChange}
