@@ -139,6 +139,15 @@ export default function App() {
     openTab(makeNoteTab(note));
   }
 
+  // Used by [[wikilink]] autocomplete/click-to-create — creates a titled note
+  // without opening a tab for it, so the user stays in the note they're
+  // linking from.
+  async function createLinkedNote(folderId: string | null, title: string): Promise<Note> {
+    const created = await store.createNote(folderId);
+    const renamed = await store.updateNote(created.id, { title });
+    return renamed ?? created;
+  }
+
   async function deleteNote(id: string) {
     await store.deleteNote(id);
     closeTabsByRefIds(new Set([id]));
@@ -240,6 +249,9 @@ export default function App() {
             }
             onDeleteFolder={deleteFolder}
             onOpenCommand={() => setCommandOpen(true)}
+            onCreateNote={createLinkedNote}
+            vaultPath={store.vaultPath}
+            onRestoreVersion={store.restoreVersion}
           />
         </div>
       </div>

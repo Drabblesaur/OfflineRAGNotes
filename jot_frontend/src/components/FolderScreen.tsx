@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import type { Note } from "@/components/NoteScreen";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import FolderPicker from "@/components/FolderPicker";
+import { searchNotes } from "@/lib/search";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -94,17 +95,6 @@ function sortNotes(notes: Note[], key: SortKey): Note[] {
         return (b.title || "Untitled").localeCompare(a.title || "Untitled");
     }
   });
-}
-
-function filterNotes(notes: Note[], query: string): Note[] {
-  if (!query.trim()) return notes;
-  const q = query.toLowerCase();
-  return notes.filter(
-    (note) =>
-      (note.title || "Untitled").toLowerCase().includes(q) ||
-      getPlainTextPreview(note).toLowerCase().includes(q) ||
-      note.tags.some((tag) => tag.toLowerCase().includes(q)),
-  );
 }
 
 // ── Note actions menu (shared by list row + gallery card) ──────────────────────
@@ -407,7 +397,7 @@ export default function FolderScreen({
     setSearchOpen(false);
   }
 
-  const processedNotes = sortNotes(filterNotes(notes, search), sort);
+  const processedNotes = sortNotes(searchNotes(notes, search), sort);
   const isEmpty = notes.length === 0 && subfolders.length === 0;
   const noResults =
     !isEmpty && search.trim() !== "" && processedNotes.length === 0;

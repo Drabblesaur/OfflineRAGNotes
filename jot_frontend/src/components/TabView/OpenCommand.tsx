@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { FileText, FolderOpen, Plus } from "lucide-react";
 import {
   CommandDialog,
@@ -11,6 +12,7 @@ import {
 import { DialogTitle } from "@/components/ui/dialog";
 import type { Note } from "@/components/NoteScreen";
 import type { Folder } from "@/components/FolderScreen";
+import { searchNotes } from "@/lib/search";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -42,17 +44,37 @@ export default function OpenCommand({
   onNewNote,
   onNewFolder,
 }: Props) {
+  const [search, setSearch] = useState("");
+
   function handleSelect(fn: () => void) {
     fn();
     onOpenChange(false);
   }
 
+  function handleOpenChange(next: boolean) {
+    if (!next) setSearch("");
+    onOpenChange(next);
+  }
+
+  // cmdk's built-in filter only sees each item's `value` string (title/tags
+  // below) — pre-filtering with the shared fuzzy searchNotes (title + tags +
+  // body) and disabling cmdk's own filter lets the palette match on note
+  // content too, not just titles.
+  const matchedNotes = searchNotes(notes, search);
+  const matchedFolders = search.trim()
+    ? folders.filter((f) => f.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : folders;
+
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
+    <CommandDialog open={open} onOpenChange={handleOpenChange} shouldFilter={false}>
       {/* DialogTitle required for screen reader accessibility */}
       <DialogTitle className="sr-only">Open note or folder</DialogTitle>
 
-      <CommandInput placeholder="Search notes and folders…" />
+      <CommandInput
+        placeholder="Search notes and folders…"
+        value={search}
+        onValueChange={setSearch}
+      />
 
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
@@ -78,9 +100,9 @@ export default function OpenCommand({
         <CommandSeparator />
 
         {/* ── Notes ── */}
-        {notes.length > 0 && (
+        {matchedNotes.length > 0 && (
           <CommandGroup heading="Notes">
-            {notes.map((note) => (
+            {matchedNotes.map((note) => (
               <CommandItem
                 key={note.id}
                 value={`note-${note.id}-${note.title}`}
@@ -101,12 +123,12 @@ export default function OpenCommand({
           </CommandGroup>
         )}
 
-        {notes.length > 0 && folders.length > 0 && <CommandSeparator />}
+        {matchedNotes.length > 0 && matchedFolders.length > 0 && <CommandSeparator />}
 
         {/* ── Folders ── */}
-        {folders.length > 0 && (
+        {matchedFolders.length > 0 && (
           <CommandGroup heading="Folders">
-            {folders.map((folder) => (
+            {matchedFolders.map((folder) => (
               <CommandItem
                 key={folder.id}
                 value={`folder-${folder.id}-${folder.name}`}

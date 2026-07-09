@@ -8,6 +8,8 @@ import {
   List,
   FolderInput,
   Trash2,
+  Link2,
+  History,
 } from "lucide-react";
 import TagChip from "@/components/TagChip";
 import { Button } from "@/components/ui/button";
@@ -23,7 +25,9 @@ import Editor from "@/components/editor";
 import type { ToCItem } from "@/components/editor";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import FolderPicker from "@/components/FolderPicker";
+import VersionHistory from "@/components/VersionHistory";
 import type { Folder } from "@/components/FolderScreen";
+import { computeBacklinks } from "@/lib/wikilinks";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -41,9 +45,16 @@ export type Note = {
 type Props = {
   note: Note;
   folders?: Folder[];
+  // All notes in the vault — powers [[wikilink]] resolution/autocomplete and
+  // the backlinks panel. Omitted (empty) is safe: links just show unresolved.
+  notes?: Note[];
+  vaultPath?: string | null;
   onChange?: (updated: Note) => void;
   onDelete?: () => void;
   onMove?: (folderId: string | null) => void;
+  onNavigateToNote?: (noteId: string) => void;
+  onCreateLinkedNote?: (title: string) => Promise<Note>;
+  onRestoreVersion?: (snapshot: Note) => Promise<void>;
 };
 
 // ── NoteScreen ────────────────────────────────────────────────────────────────
@@ -51,9 +62,14 @@ type Props = {
 export default function NoteScreen({
   note,
   folders = [],
+  notes = [],
+  vaultPath = null,
   onChange,
   onDelete,
   onMove,
+  onNavigateToNote,
+  onCreateLinkedNote,
+  onRestoreVersion,
 }: Props) {
   const [title, setTitle] = useState(note.title);
   const [titleFocused, setTitleFocused] = useState(false);
@@ -67,6 +83,7 @@ export default function NoteScreen({
   const [tocItems, setTocItems] = useState<ToCItem[]>([]);
   const [tocOpen, setTocOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const [tagInput, setTagInput] = useState("");
   const [tagInputOpen, setTagInputOpen] = useState(false);
@@ -121,6 +138,8 @@ export default function NoteScreen({
     setSyncedTitle(note.title);
     if (!titleFocused) setTitle(note.title);
   }
+
+  const backlinks = computeBacklinks(notes, note);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -241,6 +260,17 @@ export default function NoteScreen({
             )}
           />
         </Button>
+        {onRestoreVersion && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setHistoryOpen(true)}
+            aria-label="Version history"
+            className="mt-1 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <History className="size-5" />
+          </Button>
+        )}
         {onMove && (
           <FolderPicker
             folders={folders}
@@ -383,6 +413,9 @@ export default function NoteScreen({
             onContentChange={handleContentChange}
             onToCChange={setTocItems}
             onMenuOpenChange={handleMenuOpenChange}
+            notes={notes}
+            onNavigateToNote={onNavigateToNote}
+            onCreateNote={onCreateLinkedNote}
           />
         </div>
 
@@ -423,6 +456,38 @@ export default function NoteScreen({
           </div>
         )}
       </div>
+
+      {/* ── Backlinks ── */}
+      {backlinks.length > 0 && (
+        <div className="w-full max-w-2xl">
+          <p className="flex items-center gap-1.5 font-mono text-[11px] text-ink-500 uppercase tracking-widest mb-2">
+            <Link2 className="size-3" />
+            Linked mentions
+          </p>
+          <div className="flex flex-col gap-1 border border-line rounded-card bg-paper-card shadow-xs p-2">
+            {backlinks.map((linker) => (
+              <button
+                key={linker.id}
+                type="button"
+                onClick={() => onNavigateToNote?.(linker.id)}
+                className="text-left text-sm rounded-sm px-2 py-1.5 text-foreground hover:bg-paper-panel transition-colors"
+              >
+                {linker.title || "Untitled"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {onRestoreVersion && (
+        <VersionHistory
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          vaultPath={vaultPath}
+          note={note}
+          onRestore={onRestoreVersion}
+        />
+      )}
     </div>
   );
 }

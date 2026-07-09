@@ -116,6 +116,31 @@ pub fn create_dir(vault_path: String, rel_path: String) -> Result<(), String> {
     fs::create_dir_all(target).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn read_file(vault_path: String, rel_path: String) -> Result<String, String> {
+    let target = safe_join(&vault_path, &rel_path)?;
+    fs::read_to_string(target).map_err(|e| e.to_string())
+}
+
+// Non-recursive filename listing (no directory-vs-file distinction, no
+// dotfile filtering — callers control what lives under `rel_path`).
+// Missing directory is not an error: an empty result just means "no entries
+// yet", which is the common case for a note's version folder before its
+// first snapshot.
+#[tauri::command]
+pub fn list_dir(vault_path: String, rel_path: String) -> Result<Vec<String>, String> {
+    let target = safe_join(&vault_path, &rel_path)?;
+    if !target.exists() {
+        return Ok(Vec::new());
+    }
+    let mut names = Vec::new();
+    for entry in fs::read_dir(target).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        names.push(entry.file_name().to_string_lossy().to_string());
+    }
+    Ok(names)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,6 +248,35 @@ mod tests {
         let scan = read_vault(vault_path.clone()).unwrap();
         assert_eq!(scan.files.len(), 1);
         assert_eq!(scan.dirs.len(), 0);
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn read_file_reads_single_file() {
+        let dir = scratch_dir("readfile");
+        let vault_path = dir.to_string_lossy().to_string();
+        write_note(vault_path.clone(), "Note.md".into(), "hello world".into()).unwrap();
+
+        let content = read_file(vault_path, "Note.md".into()).unwrap();
+        assert_eq!(content, "hello world");
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn list_dir_lists_filenames_and_tolerates_missing_dir() {
+        let dir = scratch_dir("listdir");
+        let vault_path = dir.to_string_lossy().to_string();
+        write_note(vault_path.clone(), ".jot/versions/abc/one.md".into(), "1".into()).unwrap();
+        write_note(vault_path.clone(), ".jot/versions/abc/two.md".into(), "2".into()).unwrap();
+
+        let mut names = list_dir(vault_path.clone(), ".jot/versions/abc".into()).unwrap();
+        names.sort();
+        assert_eq!(names, vec!["one.md".to_string(), "two.md".to_string()]);
+
+        let missing = list_dir(vault_path, ".jot/versions/does-not-exist".into()).unwrap();
+        assert!(missing.is_empty());
 
         fs::remove_dir_all(&dir).ok();
     }

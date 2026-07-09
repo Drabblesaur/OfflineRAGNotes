@@ -32,6 +32,12 @@ type Props = {
   onDeleteFolder?: (folderId: string) => void;
   // Opens the app-level command palette (owned by App.tsx, shared with Sidebar)
   onOpenCommand: () => void;
+  // [[Wikilink]] support: creates a note titled `title` in `folderId` without
+  // opening it (used while the user is still typing in the linking note).
+  onCreateNote?: (folderId: string | null, title: string) => Promise<Note>;
+  // Version history: null while no vault is open yet.
+  vaultPath?: string | null;
+  onRestoreVersion?: (noteId: string, snapshot: Note) => Promise<Note | undefined>;
 };
 
 // ── TabView ───────────────────────────────────────────────────────────────────
@@ -55,6 +61,9 @@ export default function TabView({
   onMoveNote,
   onDeleteFolder,
   onOpenCommand,
+  onCreateNote,
+  vaultPath = null,
+  onRestoreVersion,
 }: Props) {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
@@ -108,6 +117,7 @@ export default function TabView({
                     <NoteScreen
                       note={note}
                       folders={folders}
+                      notes={notes}
                       onChange={onNoteChange}
                       onDelete={
                         onDeleteNote ? () => onDeleteNote(note.id) : undefined
@@ -115,6 +125,23 @@ export default function TabView({
                       onMove={
                         onMoveNote
                           ? (folderId) => onMoveNote(note.id, folderId)
+                          : undefined
+                      }
+                      onNavigateToNote={(noteId) => {
+                        const target = notesById.get(noteId);
+                        if (target) onNoteSelect?.(target);
+                      }}
+                      onCreateLinkedNote={
+                        onCreateNote
+                          ? (title) => onCreateNote(note.folderId, title)
+                          : undefined
+                      }
+                      vaultPath={vaultPath}
+                      onRestoreVersion={
+                        onRestoreVersion
+                          ? async (snapshot) => {
+                              await onRestoreVersion(note.id, snapshot);
+                            }
                           : undefined
                       }
                     />

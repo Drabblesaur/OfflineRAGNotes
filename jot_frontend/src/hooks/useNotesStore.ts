@@ -3,6 +3,8 @@ import type { Note } from "@/components/NoteScreen";
 import type { Folder } from "@/components/FolderScreen";
 import * as vault from "@/lib/vault";
 import { getVaultPath, setVaultPath as persistVaultPath } from "@/lib/vaultPath";
+import { extractWikiLinkTitles, rewriteLinksTo } from "@/lib/wikilinks";
+import { snapshotNote } from "@/lib/versions";
 
 function makeEmptyNote(folderId: string | null): Note {
   return {
@@ -24,7 +26,10 @@ export type NotesStore = {
   vaultPath: string | null;
   selectVault: (path: string) => void;
   createNote: (folderId: string | null) => Promise<Note>;
-  updateNote: (id: string, patch: Partial<Note>) => Promise<void>;
+  updateNote: (id: string, patch: Partial<Note>) => Promise<Note | undefined>;
+  // Restores `id` to `snapshot`'s content — force-snapshots the note's
+  // current (pre-restore) state first so restoring is itself always undoable.
+  restoreVersion: (id: string, snapshot: Note) => Promise<Note | undefined>;
   deleteNote: (id: string) => Promise<void>;
   moveNote: (id: string, folderId: string | null) => Promise<void>;
   createFolder: (parentId: string | null) => Promise<Folder>;
@@ -99,11 +104,39 @@ export function useNotesStore(): NotesStore {
     [vaultPath],
   );
 
+  // When a note's title changes, rewrite [[Old Title]] occurrences in every
+  // other note's body to [[New Title]] so links don't silently break —
+  // mirrors Obsidian's rename behavior. Runs after the rename itself is
+  // persisted; failures here don't roll back the rename.
+  const propagateTitleRename = useCallback(
+    async (oldTitle: string, newTitle: string, renamedId: string) => {
+      if (!vaultPath || !oldTitle.trim() || oldTitle === newTitle) return;
+      const oldLower = oldTitle.trim().toLowerCase();
+      const linkers = notesRef.current.filter(
+        (n) =>
+          n.id !== renamedId &&
+          extractWikiLinkTitles(n.bodyMd).some((t) => t.toLowerCase() === oldLower),
+      );
+      for (const linker of linkers) {
+        const rewritten: Note = {
+          ...linker,
+          bodyMd: rewriteLinksTo(oldTitle, newTitle, linker.bodyMd),
+        };
+        const siblingTitles = notesRef.current
+          .filter((n) => n.folderId === rewritten.folderId && n.id !== linker.id)
+          .map((n) => n.title);
+        const saved = await vault.writeNote(vaultPath, linker, rewritten, siblingTitles);
+        notesRef.current = notesRef.current.map((n) => (n.id === linker.id ? saved : n));
+      }
+    },
+    [vaultPath],
+  );
+
   const updateNote = useCallback(
     async (id: string, patch: Partial<Note>) => {
-      if (!vaultPath) return;
+      if (!vaultPath) return undefined;
       const existing = notesRef.current.find((n) => n.id === id);
-      if (!existing) return;
+      if (!existing) return undefined;
       const next: Note = { ...existing, ...patch, lastEditedAt: new Date() };
       // Publish the in-flight change to the ref immediately so a second
       // updateNote call arriving before this one's write resolves builds its
@@ -114,9 +147,42 @@ export function useNotesStore(): NotesStore {
         .map((n) => n.title);
       const written = await vault.writeNote(vaultPath, existing, next, siblingTitles);
       notesRef.current = notesRef.current.map((n) => (n.id === id ? written : n));
+
+      if (patch.title !== undefined && written.title !== existing.title) {
+        await propagateTitleRename(existing.title, written.title, id);
+      }
+
+      // Fire-and-forget: version history is a safety net, not part of the
+      // save path — a snapshot failure must never fail or block the actual
+      // save the user is waiting on.
+      void snapshotNote(vaultPath, written).catch((err) =>
+        console.error("Failed to snapshot note version", err),
+      );
+
       setNotes(notesRef.current);
+      return written;
     },
-    [vaultPath],
+    [vaultPath, propagateTitleRename],
+  );
+
+  const restoreVersion = useCallback(
+    async (id: string, snapshot: Note) => {
+      if (!vaultPath) return undefined;
+      const current = notesRef.current.find((n) => n.id === id);
+      if (current) {
+        await snapshotNote(vaultPath, current, { force: true }).catch((err) =>
+          console.error("Failed to snapshot pre-restore state", err),
+        );
+      }
+      return updateNote(id, {
+        title: snapshot.title,
+        tags: snapshot.tags,
+        favorite: snapshot.favorite,
+        date: snapshot.date,
+        bodyMd: snapshot.bodyMd,
+      });
+    },
+    [vaultPath, updateNote],
   );
 
   const deleteNote = useCallback(
@@ -249,6 +315,7 @@ export function useNotesStore(): NotesStore {
     selectVault,
     createNote,
     updateNote,
+    restoreVersion,
     deleteNote,
     moveNote,
     createFolder,

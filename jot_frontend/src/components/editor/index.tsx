@@ -12,6 +12,8 @@ import {
 import { UniqueID } from "@tiptap/extension-unique-id";
 import { useRef, useEffect } from "react";
 import Toolbar from "@/components/Toolbar";
+import { WikiLink, type WikiLinkBridge } from "@/components/editor/extensions/WikiLink";
+import type { Note } from "@/components/NoteScreen";
 
 export type ToCItem = {
   id: string;
@@ -31,6 +33,11 @@ type Props = {
   onContentChange: (content: string) => void;
   onToCChange?: (items: ToCItem[]) => void;
   onMenuOpenChange?: (open: boolean) => void;
+  /** All notes in the vault — used to resolve [[wikilinks]] and drive autocomplete. */
+  notes?: Note[];
+  onNavigateToNote?: (noteId: string) => void;
+  /** Creates a note titled `title` in this note's folder; does not navigate away. */
+  onCreateNote?: (title: string) => Promise<Note>;
 };
 
 export default function Editor({
@@ -40,9 +47,43 @@ export default function Editor({
   onContentChange,
   onToCChange,
   onMenuOpenChange,
+  notes = [],
+  onNavigateToNote,
+  onCreateNote,
 }: Props) {
   const menuOpenRef = useRef(false);
   const prevNoteId = useRef<string | null>(null);
+
+  // Latest callbacks/data the long-lived WikiLink extension reads from on
+  // every keystroke/click, since the editor instance (and its extensions)
+  // is created once and outlives note switches — see the setContent effect
+  // below. Same ref-bridge pattern as notesRef/foldersRef in useNotesStore.
+  const latestRef = useRef({ notes, onNavigateToNote, onCreateNote });
+
+  const bridgeRef = useRef<WikiLinkBridge>({
+    notes,
+    onClickLink: (title) => {
+      const { notes: liveNotes, onNavigateToNote: navigate, onCreateNote: create } =
+        latestRef.current;
+      const match = liveNotes.find(
+        (n) => n.title.trim().toLowerCase() === title.trim().toLowerCase(),
+      );
+      if (match) {
+        navigate?.(match.id);
+        return;
+      }
+      void create?.(title).then((created) => navigate?.(created.id));
+    },
+    onCreateNoteSilently: async (title) => {
+      await latestRef.current.onCreateNote?.(title);
+    },
+  });
+
+  useEffect(() => {
+    latestRef.current = { notes, onNavigateToNote, onCreateNote };
+    bridgeRef.current.notes = notes;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes]);
 
   const editor = useEditor({
     extensions: [
@@ -51,6 +92,7 @@ export default function Editor({
       Highlight,
       ListKeymap,
       Markdown,
+      WikiLink.configure({ bridgeRef }),
       GlobalDragHandle.configure({
         dragHandleWidth: 20,
         scrollTreshold: 100,

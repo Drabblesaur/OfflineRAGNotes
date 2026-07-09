@@ -10,6 +10,8 @@ pub fn run() {
       vault::rename_path,
       vault::delete_path,
       vault::create_dir,
+      vault::read_file,
+      vault::list_dir,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
