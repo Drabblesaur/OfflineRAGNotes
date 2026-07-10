@@ -4,6 +4,7 @@ import TabView from "./components/TabView";
 import Sidebar from "./components/Sidebar";
 import OpenCommand from "./components/TabView/OpenCommand";
 import Settings from "./components/Settings";
+import TrashScreen from "./components/TrashScreen";
 import VaultPicker from "./components/Onboarding/VaultPicker";
 import type { Tab } from "./components/TabView/Tabs";
 import type { Note } from "./components/NoteScreen";
@@ -11,6 +12,7 @@ import type { Folder } from "./components/FolderScreen";
 import { useNotesStore } from "./hooks/useNotesStore";
 import { useTheme } from "./hooks/useTheme";
 import { loadSession, saveSession } from "./lib/session";
+import { getTrashRetentionDays } from "./lib/trashSettings";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,7 @@ export default function App() {
   );
   const [commandOpen, setCommandOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
   const activeFolderId = activeTab?.type === "folder" ? activeTab.refId : null;
@@ -226,6 +229,7 @@ export default function App() {
           onDeleteNote={deleteNote}
           onOpenCommand={() => setCommandOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenTrash={() => setTrashOpen(true)}
         />
         <div className="flex-1 min-w-0">
           <TabView
@@ -274,6 +278,19 @@ export default function App() {
         folders={store.folders}
         theme={theme}
         onThemeChange={setTheme}
+      />
+
+      <TrashScreen
+        open={trashOpen}
+        onOpenChange={setTrashOpen}
+        trash={store.trash}
+        folders={store.folders}
+        retentionDays={getTrashRetentionDays()}
+        onRestore={async (trashId) => {
+          await store.restoreNote(trashId);
+        }}
+        onDeleteForever={store.deleteForever}
+        onEmptyTrash={store.emptyTrash}
       />
     </TooltipProvider>
   );

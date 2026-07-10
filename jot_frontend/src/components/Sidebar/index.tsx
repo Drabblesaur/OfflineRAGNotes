@@ -10,6 +10,7 @@ import {
   Inbox,
   Folder as FolderIcon,
   Settings as SettingsIcon,
+  Trash2 as TrashIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,7 @@ type Props = {
   onDeleteNote: (noteId: string) => void;
   onOpenCommand: () => void;
   onOpenSettings: () => void;
+  onOpenTrash: () => void;
 };
 
 export default function Sidebar({
@@ -66,6 +68,7 @@ export default function Sidebar({
   onDeleteNote,
   onOpenCommand,
   onOpenSettings,
+  onOpenTrash,
 }: Props) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
 
@@ -184,6 +187,15 @@ export default function Sidebar({
         <div className="flex-1 min-w-0">
           <IndexStatusBadge />
         </div>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onOpenTrash}
+          aria-label="Trash"
+          className="text-ink-500 hover:text-ink-900"
+        >
+          <TrashIcon className="size-3.5" />
+        </Button>
         <Button
           variant="ghost"
           size="icon-sm"
@@ -321,7 +333,7 @@ function SidebarRow({
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={`Delete "${note.title || "Untitled"}"?`}
-        description="This note will be permanently deleted."
+        description="This note will be moved to Trash."
         onConfirm={() => {
           setDeleteOpen(false);
           onDeleteNote(note.id);

@@ -302,7 +302,7 @@ export default function NoteScreen({
               open={deleteOpen}
               onOpenChange={setDeleteOpen}
               title={`Delete "${title || "Untitled"}"?`}
-              description="This note will be permanently deleted."
+              description="This note will be moved to Trash."
               onConfirm={() => {
                 setDeleteOpen(false);
                 onDelete();

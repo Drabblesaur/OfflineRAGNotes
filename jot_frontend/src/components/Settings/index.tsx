@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { clearVaultPath } from "@/lib/vaultPath";
+import { getTrashRetentionDays, setTrashRetentionDays } from "@/lib/trashSettings";
 import { useIndexStatus } from "@/hooks/useIndexStatus";
 import { describeIndexStatus } from "@/lib/indexStatus";
 import type { Theme } from "@/hooks/useTheme";
@@ -39,8 +41,16 @@ export default function Settings({
   onThemeChange,
 }: Props) {
   const [clearOpen, setClearOpen] = useState(false);
+  const [retentionDays, setRetentionDays] = useState(() => getTrashRetentionDays());
   const indexStatus = useIndexStatus();
   const { icon, label, tooltip } = describeIndexStatus(indexStatus);
+
+  function handleRetentionChange(value: string) {
+    const parsed = Number(value);
+    const next = Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0;
+    setRetentionDays(next);
+    setTrashRetentionDays(next);
+  }
 
   function exportNotes() {
     const blob = new Blob(
@@ -116,6 +126,33 @@ export default function Settings({
                 <FolderOpen className="size-3.5" />
                 Switch vault
               </Button>
+            </SettingsSection>
+
+            {/* ── Trash ── */}
+            <SettingsSection title="Trash">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Delete permanently after
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={retentionDays}
+                    onChange={(e) => handleRetentionChange(e.target.value)}
+                    className="h-7 w-16 text-sm text-right"
+                    aria-label="Days to keep trash before permanent deletion"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {retentionDays === 1 ? "day" : "days"}
+                  </span>
+                </div>
+              </div>
+              {retentionDays === 0 && (
+                <p className="text-xs text-muted-foreground/70">
+                  0 = never auto-delete — you'll need to empty Trash manually.
+                </p>
+              )}
             </SettingsSection>
 
             {/* ── Indexing ── */}

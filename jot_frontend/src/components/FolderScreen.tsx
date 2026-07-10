@@ -158,7 +158,7 @@ function NoteActionsMenu({
             open={deleteOpen}
             onOpenChange={setDeleteOpen}
             title={`Delete "${note.title || "Untitled"}"?`}
-            description="This note will be permanently deleted."
+            description="This note will be moved to Trash."
             onConfirm={() => {
               setDeleteOpen(false);
               onDelete(note.id);
@@ -524,11 +524,11 @@ export default function FolderScreen({
                   open={deleteFolderOpen}
                   onOpenChange={setDeleteFolderOpen}
                   title={`Delete "${folder.name || "Untitled Folder"}"?`}
-                  description={`This will permanently delete ${notes.length} ${
-                    notes.length === 1 ? "note" : "notes"
-                  } and ${subfolders.length} ${
+                  description={`This will delete ${subfolders.length} ${
                     subfolders.length === 1 ? "subfolder" : "subfolders"
-                  } (including everything inside them).`}
+                  } and move ${notes.length} ${
+                    notes.length === 1 ? "note" : "notes"
+                  } (including everything inside them) to Trash.`}
                   onConfirm={() => {
                     setDeleteFolderOpen(false);
                     onDeleteFolder();

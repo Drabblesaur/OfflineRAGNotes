@@ -313,11 +313,11 @@ function FolderNode({
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={`Delete "${folder.name || "Untitled Folder"}"?`}
-        description={`This will permanently delete ${directNoteCount} ${
-          directNoteCount === 1 ? "note" : "notes"
-        } and ${directSubfolderCount} ${
+        description={`This will delete ${directSubfolderCount} ${
           directSubfolderCount === 1 ? "subfolder" : "subfolders"
-        } (including everything inside them).`}
+        } and move ${directNoteCount} ${
+          directNoteCount === 1 ? "note" : "notes"
+        } (including everything inside them) to Trash.`}
         onConfirm={() => {
           setDeleteOpen(false);
           onDeleteFolder(folder.id);

@@ -5,6 +5,9 @@ import * as vault from "@/lib/vault";
 import { getVaultPath, setVaultPath as persistVaultPath } from "@/lib/vaultPath";
 import { extractWikiLinkTitles, rewriteLinksTo } from "@/lib/wikilinks";
 import { snapshotNote } from "@/lib/versions";
+import * as trash from "@/lib/trash";
+import type { TrashedNote } from "@/lib/trash";
+import { getTrashRetentionDays } from "@/lib/trashSettings";
 
 function makeEmptyNote(folderId: string | null): Note {
   return {
@@ -22,6 +25,7 @@ function makeEmptyNote(folderId: string | null): Note {
 export type NotesStore = {
   notes: Note[];
   folders: Folder[];
+  trash: TrashedNote[];
   loading: boolean;
   vaultPath: string | null;
   selectVault: (path: string) => void;
@@ -30,11 +34,19 @@ export type NotesStore = {
   // Restores `id` to `snapshot`'s content — force-snapshots the note's
   // current (pre-restore) state first so restoring is itself always undoable.
   restoreVersion: (id: string, snapshot: Note) => Promise<Note | undefined>;
+  // Moves a note to Trash rather than deleting it outright.
   deleteNote: (id: string) => Promise<void>;
+  // Restores a trashed note — back to its original folder if that folder
+  // still exists, otherwise to the vault root.
+  restoreNote: (trashId: string) => Promise<Note | undefined>;
+  deleteForever: (trashId: string) => Promise<void>;
+  emptyTrash: () => Promise<void>;
   moveNote: (id: string, folderId: string | null) => Promise<void>;
   createFolder: (parentId: string | null) => Promise<Folder>;
   renameFolder: (id: string, name: string) => Promise<Map<string, string>>;
   moveFolder: (id: string, parentId: string | null) => Promise<Map<string, string>>;
+  // Deletes a folder; every note inside (recursively) is moved to Trash
+  // rather than deleted outright.
   deleteFolder: (
     id: string,
   ) => Promise<{ deletedNoteIds: string[]; deletedFolderIds: string[] }>;
@@ -50,6 +62,7 @@ export type NotesStore = {
 export function useNotesStore(): NotesStore {
   const [notes, setNotes] = useState<Note[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [trashItems, setTrashItems] = useState<TrashedNote[]>([]);
   const [vaultPath, setVaultPathState] = useState<string | null>(() => getVaultPath());
   const [loading, setLoading] = useState<boolean>(() => getVaultPath() !== null);
 
@@ -78,6 +91,14 @@ export function useNotesStore(): NotesStore {
       setNotes(loadedNotes);
       setFolders(loadedFolders);
       setLoading(false);
+      // Trash is loaded after the main scan resolves and doesn't block it —
+      // it's a secondary view, not needed to render notes/folders.
+      await trash.purgeExpiredTrash(vaultPath, getTrashRetentionDays()).catch((err) =>
+        console.error("Failed to purge expired trash", err),
+      );
+      if (cancelled) return;
+      const loadedTrash = await trash.listTrash(vaultPath).catch(() => []);
+      if (!cancelled) setTrashItems(loadedTrash);
     })();
     return () => {
       cancelled = true;
@@ -190,11 +211,50 @@ export function useNotesStore(): NotesStore {
       if (!vaultPath) return;
       const note = notesRef.current.find((n) => n.id === id);
       if (!note) return;
-      await vault.deleteNote(vaultPath, note);
+      await trash.moveNoteToTrash(vaultPath, note);
       setNotes((prev) => prev.filter((n) => n.id !== id));
+      setTrashItems((prev) => [{ ...note, deletedAt: new Date() }, ...prev]);
     },
     [vaultPath],
   );
+
+  const restoreNote = useCallback(
+    async (trashId: string) => {
+      if (!vaultPath) return undefined;
+      const trashed = trashItems.find((t) => t.id === trashId);
+      if (!trashed) return undefined;
+      // Restore into the original folder only if it still exists — a
+      // deleted-then-emptied folder shouldn't silently resurrect.
+      const targetFolderId = foldersRef.current.some((f) => f.id === trashed.folderId)
+        ? trashed.folderId
+        : null;
+      const siblingTitles = notesRef.current
+        .filter((n) => n.folderId === targetFolderId)
+        .map((n) => n.title);
+      const restored = await trash.restoreFromTrash(vaultPath, trashed, targetFolderId, siblingTitles);
+      setNotes((prev) => [...prev, restored]);
+      setTrashItems((prev) => prev.filter((t) => t.id !== trashId));
+      return restored;
+    },
+    [vaultPath, trashItems],
+  );
+
+  const deleteForever = useCallback(
+    async (trashId: string) => {
+      if (!vaultPath) return;
+      await trash.deleteForever(vaultPath, trashId);
+      setTrashItems((prev) => prev.filter((t) => t.id !== trashId));
+    },
+    [vaultPath],
+  );
+
+  const emptyTrash = useCallback(async () => {
+    if (!vaultPath) return;
+    for (const t of trashItems) {
+      await trash.deleteForever(vaultPath, t.id);
+    }
+    setTrashItems([]);
+  }, [vaultPath, trashItems]);
 
   const moveNote = useCallback(
     async (id: string, folderId: string | null) => {
@@ -262,24 +322,22 @@ export function useNotesStore(): NotesStore {
     [vaultPath, applyFolderPathMap],
   );
 
-  // Cascades: deleting a folder deletes every note directly inside it and
-  // recurses into every subfolder. Returns the full set of deleted ids so
-  // callers (App.tsx) can close any tabs pointing at them. The filesystem
-  // does the actual recursive delete in one call; this walk just figures out
-  // which in-memory ids that call is about to invalidate.
+  // Cascades: deleting a folder moves every note inside it (recursively) to
+  // Trash and recurses into every subfolder. Returns the full set of
+  // affected ids so callers (App.tsx) can close any tabs pointing at them.
   const deleteFolder = useCallback(
     async (id: string) => {
       if (!vaultPath) return { deletedNoteIds: [], deletedFolderIds: [] };
       const folder = foldersRef.current.find((f) => f.id === id);
       if (!folder) return { deletedNoteIds: [], deletedFolderIds: [] };
 
-      const deletedNoteIds: string[] = [];
       const deletedFolderIds: string[] = [];
+      const notesToTrash: Note[] = [];
 
       const collect = (folderId: string) => {
         deletedFolderIds.push(folderId);
         for (const note of notesRef.current) {
-          if (note.folderId === folderId) deletedNoteIds.push(note.id);
+          if (note.folderId === folderId) notesToTrash.push(note);
         }
         for (const f of foldersRef.current) {
           if (f.parentId === folderId) collect(f.id);
@@ -287,10 +345,21 @@ export function useNotesStore(): NotesStore {
       };
       collect(id);
 
+      // Move notes to Trash first (each write+delete), then remove the
+      // (now note-empty) directory tree.
+      const deletedAt = new Date();
+      for (const note of notesToTrash) {
+        await trash.moveNoteToTrash(vaultPath, note);
+      }
       await vault.deleteFolder(vaultPath, folder);
 
+      const deletedNoteIds = notesToTrash.map((n) => n.id);
       setNotes((prev) => prev.filter((n) => !deletedNoteIds.includes(n.id)));
       setFolders((prev) => prev.filter((f) => !deletedFolderIds.includes(f.id)));
+      setTrashItems((prev) => [
+        ...notesToTrash.map((n) => ({ ...n, deletedAt })),
+        ...prev,
+      ]);
 
       return { deletedNoteIds, deletedFolderIds };
     },
@@ -310,6 +379,7 @@ export function useNotesStore(): NotesStore {
   return {
     notes,
     folders,
+    trash: trashItems,
     loading,
     vaultPath,
     selectVault,
@@ -317,6 +387,9 @@ export function useNotesStore(): NotesStore {
     updateNote,
     restoreVersion,
     deleteNote,
+    restoreNote,
+    deleteForever,
+    emptyTrash,
     moveNote,
     createFolder,
     renameFolder,
